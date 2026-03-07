@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#137fec",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101922",
+            },
+            fontFamily: {
+              "display": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<title>My Appointments | DoctorDirect</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-primary/10 bg-white dark:bg-slate-900 px-6 py-3 lg:px-10">
+<div class="flex items-center gap-4 text-primary">
+<div class="size-8 flex items-center justify-center bg-primary rounded-lg text-white">
+<span class="material-symbols-outlined">medical_services</span>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-[-0.015em]">DoctorDirect</h2>
+</div>
+<div class="flex flex-1 justify-end gap-4 items-center">
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20" data-alt="User profile avatar portrait" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCcqTmY4cJpXaLM6SdNsD2yhJm8sXewA4A68M_i5zuR2foZp5bhKvONgKmd7QoTswkxwWAFncXLbaiMzlXu9Sfs_tmXd9XCKRra6tNlkat3QaiA6yZP7Qi3RsNxiEyvA41vSNtDTTZ05-oL3GFwTODs41lTfBK6HmYxO2HNjJRR_iMwlDUTW-DMlgdk4ccBXUwh9oz5_b50-cdSLOKb3VfS7Fvh2NlBiXw-xTeDTJpn_aRtek3j-hpEzbqbBfgZT4TsNPEs8a4s-jVF");'></div>
+</div>
+</header>
+<div class="flex grow">
+<aside class="hidden md:flex w-64 flex-col border-r border-primary/10 bg-white dark:bg-slate-900 p-4 gap-6">
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-slate-100 text-base font-bold leading-normal px-3">Patient Portal</h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-normal leading-normal px-3">Manage your health UK</p>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="text-sm font-semibold">Home</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20 transition-all" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="text-sm font-semibold">My Appointments</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">stethoscope</span>
+<span class="text-sm font-semibold">Symptom Checker</span>
+</a>
+<div class="my-4 border-t border-primary/5"></div>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-primary/5 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-sm font-semibold">Settings</span>
+</a>
+</nav>
+</aside>
+<main class="flex-1 flex flex-col p-6 lg:p-10 max-w-5xl mx-auto w-full">
+<div class="flex flex-col gap-2 mb-8">
+<h2 class="text-slate-900 dark:text-slate-100 text-3xl font-black leading-tight tracking-tight">My Appointments</h2>
+<p class="text-slate-500 dark:text-slate-400 text-base">View and manage your clinical consultations across the UK</p>
+</div>
+<div class="mb-8 border-b border-primary/10 flex gap-8">
+<button class="border-b-2 border-primary text-primary pb-3 text-sm font-bold tracking-wide">Upcoming</button>
+<button class="border-b-2 border-transparent text-slate-500 hover:text-slate-700 pb-3 text-sm font-bold tracking-wide">Past Appointments</button>
+</div>
+<div class="flex flex-col gap-6">
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-primary/10 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="p-5 md:p-6">
+<div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+<div class="flex gap-4">
+<div class="size-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">medical_services</span>
+</div>
+<div>
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Dr. Sarah Jenkins</h3>
+<p class="text-primary text-sm font-semibold mb-1">General Practitioner (GP)</p>
+<div class="flex items-center gap-1 text-slate-500 text-xs">
+<span class="material-symbols-outlined text-sm">location_on</span>
+<span>Chelsea Medical Centre, London SW3</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-2">
+<span class="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-bold rounded-full uppercase tracking-wider">New</span>
+<p class="text-slate-400 text-[10px] uppercase font-bold">Europe/London Time</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg mb-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">calendar_today</span>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-bold">Date</p>
+<p class="text-sm font-bold">Monday, 24 Oct 2023</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">schedule</span>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-bold">Time Slot (T1)</p>
+<p class="text-sm font-bold">09:00 AM - 09:20 AM</p>
+</div>
+</div>
+<div class="flex items-center gap-3 border-t md:border-t-0 md:border-l border-primary/10 pt-4 md:pt-0 md:pl-4">
+<span class="material-symbols-outlined text-primary text-xl">payments</span>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-bold">Payment Method</p>
+<p class="text-sm font-bold">Pay at Clinic (MVP)</p>
+</div>
+</div>
+</div>
+<div class="flex flex-wrap gap-3">
+<button class="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-primary text-white text-sm font-bold py-2.5 rounded-lg hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-lg">info</span>
+                                        View Clinic Info
+                                    </button>
+<button class="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 text-sm font-bold py-2.5 rounded-lg hover:bg-red-50 transition-colors">
+<span class="material-symbols-outlined text-lg">cancel</span>
+                                        Cancel Appointment
+                                    </button>
+</div>
+<p class="text-[10px] text-slate-400 mt-3 text-center italic">Cancellations must be made at least 24 hours in advance to avoid fees.</p>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-primary/10 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+<div class="p-5 md:p-6">
+<div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+<div class="flex gap-4">
+<div class="size-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">medical_information</span>
+</div>
+<div>
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Dr. Michael Thorne</h3>
+<p class="text-primary text-sm font-semibold mb-1">Cardiologist</p>
+<div class="flex items-center gap-1 text-slate-500 text-xs">
+<span class="material-symbols-outlined text-sm">location_on</span>
+<span>Manchester Central Hospital, M13</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col items-end gap-2">
+<span class="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs font-bold rounded-full uppercase tracking-wider">New</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg mb-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">calendar_today</span>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-bold">Date</p>
+<p class="text-sm font-bold">Friday, 27 Oct 2023</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">schedule</span>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-bold">Time Slot (T4)</p>
+<p class="text-sm font-bold">02:30 PM - 02:50 PM</p>
+</div>
+</div>
+<div class="flex items-center gap-3 border-t md:border-t-0 md:border-l border-primary/10 pt-4 md:pt-0 md:pl-4">
+<span class="material-symbols-outlined text-primary text-xl">payments</span>
+<div>
+<p class="text-[10px] text-slate-500 uppercase font-bold">Payment Method</p>
+<p class="text-sm font-bold">Pay at Clinic (MVP)</p>
+</div>
+</div>
+</div>
+<div class="flex flex-wrap gap-3">
+<button class="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-primary text-white text-sm font-bold py-2.5 rounded-lg hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-lg">info</span>
+                                        View Clinic Info
+                                    </button>
+<button class="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-white border border-red-200 text-red-600 text-sm font-bold py-2.5 rounded-lg hover:bg-red-50 transition-colors">
+<span class="material-symbols-outlined text-lg">cancel</span>
+                                        Cancel Appointment
+                                    </button>
+</div>
+</div>
+</div>
+<div class="mt-8">
+<h4 class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Past Appointments</h4>
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-primary/5 overflow-hidden opacity-75 grayscale-[0.5]">
+<div class="p-5 md:p-6">
+<div class="flex flex-wrap justify-between items-start gap-4 mb-4">
+<div class="flex gap-4">
+<div class="size-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+<span class="material-symbols-outlined">history</span>
+</div>
+<div>
+<h3 class="text-md font-bold text-slate-700 dark:text-slate-300">Dr. Helen Moore</h3>
+<p class="text-slate-500 text-xs font-semibold">Dermatologist</p>
+</div>
+</div>
+<span class="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-[10px] font-bold rounded uppercase tracking-wider">Done</span>
+</div>
+<div class="flex justify-between items-center mb-4 text-sm">
+<p class="text-slate-500"><span class="font-semibold">15 Sep 2023</span> • T8 (04:45 PM)</p>
+<p class="text-slate-500 text-xs">Birmingham Skin Clinic</p>
+</div>
+<div class="flex gap-3">
+<button class="flex-1 text-primary bg-primary/10 text-xs font-bold py-2 rounded hover:bg-primary/20 transition-colors">Book Again</button>
+<button class="flex-1 text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold py-2 rounded hover:bg-slate-200 transition-colors">View Visit History</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</div>
+</body></html>
