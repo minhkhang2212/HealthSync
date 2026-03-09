@@ -1,6 +1,40 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/apiClient';
 
+const buildClinicPayload = (clinicData = {}, methodOverride = null) => {
+    const payload = new FormData();
+
+    if (clinicData.name !== undefined) {
+        payload.append('name', clinicData.name ?? '');
+    }
+
+    if (clinicData.address !== undefined) {
+        payload.append('address', clinicData.address ?? '');
+    }
+
+    if (clinicData.description !== undefined) {
+        payload.append('description', clinicData.description ?? '');
+    }
+
+    if (clinicData.image !== undefined && clinicData.image !== null && clinicData.image !== '') {
+        payload.append('image', clinicData.image);
+    }
+
+    if (clinicData.imageFile instanceof File) {
+        payload.append('imageFile', clinicData.imageFile);
+    }
+
+    if (clinicData.removeImage) {
+        payload.append('removeImage', '1');
+    }
+
+    if (methodOverride) {
+        payload.append('_method', methodOverride);
+    }
+
+    return payload;
+};
+
 // Async Thunks
 export const fetchClinics = createAsyncThunk(
     'clinic/fetchClinics',
@@ -18,7 +52,12 @@ export const createClinic = createAsyncThunk(
     'clinic/createClinic',
     async (clinicData, { rejectWithValue }) => {
         try {
-            const response = await apiClient.post('/admin/clinics', clinicData);
+            const payload = buildClinicPayload(clinicData);
+            const response = await apiClient.post('/admin/clinics', payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             return response.data;
         } catch (error) {
             const errors = error.response?.data?.errors;
@@ -34,10 +73,19 @@ export const updateClinic = createAsyncThunk(
     'clinic/updateClinic',
     async ({ id, data }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.patch(`/admin/clinics/${id}`, data);
+            const payload = buildClinicPayload(data, 'PATCH');
+            const response = await apiClient.post(`/admin/clinics/${id}`, payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to update clinic.');
+            const errors = error.response?.data?.errors;
+            const message = errors
+                ? Object.values(errors).flat().join(' ')
+                : error.response?.data?.message || 'Failed to update clinic.';
+            return rejectWithValue(message);
         }
     }
 );

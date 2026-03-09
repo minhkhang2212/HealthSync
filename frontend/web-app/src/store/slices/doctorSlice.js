@@ -5,7 +5,13 @@ export const fetchDoctors = createAsyncThunk(
     'doctor/fetchDoctors',
     async (params = {}, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get('/v1/doctors', { params });
+            const requestParams = { ...params };
+            const useAdminEndpoint = requestParams.admin === true;
+            delete requestParams.admin;
+
+            const response = await apiClient.get(useAdminEndpoint ? '/admin/doctors' : '/v1/doctors', {
+                params: requestParams,
+            });
             return response.data?.data ?? response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch doctors.');

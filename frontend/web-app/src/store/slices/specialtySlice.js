@@ -1,6 +1,36 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/apiClient';
 
+const buildSpecialtyPayload = (specialtyData = {}, methodOverride = null) => {
+    const payload = new FormData();
+
+    if (specialtyData.name !== undefined) {
+        payload.append('name', specialtyData.name ?? '');
+    }
+
+    if (specialtyData.description !== undefined) {
+        payload.append('description', specialtyData.description ?? '');
+    }
+
+    if (specialtyData.image !== undefined && specialtyData.image !== null && specialtyData.image !== '') {
+        payload.append('image', specialtyData.image);
+    }
+
+    if (specialtyData.imageFile instanceof File) {
+        payload.append('imageFile', specialtyData.imageFile);
+    }
+
+    if (specialtyData.removeImage) {
+        payload.append('removeImage', '1');
+    }
+
+    if (methodOverride) {
+        payload.append('_method', methodOverride);
+    }
+
+    return payload;
+};
+
 // Async Thunks
 export const fetchSpecialties = createAsyncThunk(
     'specialty/fetchSpecialties',
@@ -18,7 +48,12 @@ export const createSpecialty = createAsyncThunk(
     'specialty/createSpecialty',
     async (specialtyData, { rejectWithValue }) => {
         try {
-            const response = await apiClient.post('/admin/specialties', specialtyData);
+            const payload = buildSpecialtyPayload(specialtyData);
+            const response = await apiClient.post('/admin/specialties', payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             return response.data;
         } catch (error) {
             const errors = error.response?.data?.errors;
@@ -34,10 +69,19 @@ export const updateSpecialty = createAsyncThunk(
     'specialty/updateSpecialty',
     async ({ id, data }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.patch(`/admin/specialties/${id}`, data);
+            const payload = buildSpecialtyPayload(data, 'PATCH');
+            const response = await apiClient.post(`/admin/specialties/${id}`, payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to update specialty.');
+            const errors = error.response?.data?.errors;
+            const message = errors
+                ? Object.values(errors).flat().join(' ')
+                : error.response?.data?.message || 'Failed to update specialty.';
+            return rejectWithValue(message);
         }
     }
 );
@@ -92,7 +136,12 @@ const specialtySlice = createSlice({
         // Create
         builder
             .addCase(createSpecialty.fulfilled, (state, action) => {
-                state.specialties.push(action.payload);
+                const index = state.specialties.findIndex((s) => s.id === action.payload.id);
+                if (index !== -1) {
+                    state.specialties[index] = action.payload;
+                } else {
+                    state.specialties.push(action.payload);
+                }
             })
             .addCase(createSpecialty.rejected, (state, action) => {
                 state.error = action.payload;

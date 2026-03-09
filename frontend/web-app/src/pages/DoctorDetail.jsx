@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { createBooking } from '../store/slices/bookingSlice';
 import { fetchDoctorAvailability, fetchDoctorById } from '../store/slices/doctorSlice';
 import apiClient from '../utils/apiClient';
+import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 
 const DEFAULT_TIME_LABELS = {
     T1: '08:00',
@@ -38,7 +39,13 @@ const DoctorDetail = () => {
     React.useEffect(() => {
         const loadTimeLabels = async () => {
             try {
-                const response = await apiClient.get('/allcodes', { params: { type: 'TIME' } });
+                const cached = readAllcodeCache('TIME');
+                const response = cached
+                    ? { data: cached }
+                    : await apiClient.get('/allcodes', { params: { type: 'TIME' } });
+                if (!cached && Array.isArray(response.data)) {
+                    writeAllcodeCache('TIME', response.data);
+                }
                 const map = { ...DEFAULT_TIME_LABELS };
                 for (const code of response.data) {
                     map[code.key] = code.valueEn;

@@ -22,6 +22,7 @@ class DoctorProfileController extends Controller
 
         $query = User::query()
             ->where('roleId', 'R2')
+            ->where('isActive', true)
             ->with(['doctorInfor', 'doctorClinicSpecialties.clinic', 'doctorClinicSpecialties.specialty']);
 
         if (!empty($validated['search'])) {
@@ -56,6 +57,7 @@ class DoctorProfileController extends Controller
     {
         $doctor = User::query()
             ->where('roleId', 'R2')
+            ->where('isActive', true)
             ->with(['doctorInfor', 'doctorClinicSpecialties.clinic', 'doctorClinicSpecialties.specialty'])
             ->find($id);
 
@@ -68,7 +70,10 @@ class DoctorProfileController extends Controller
 
     public function availability(int $id, Request $request): JsonResponse
     {
-        $doctor = User::query()->where('roleId', 'R2')->find($id);
+        $doctor = User::query()
+            ->where('roleId', 'R2')
+            ->where('isActive', true)
+            ->find($id);
         if (!$doctor) {
             return response()->json(['message' => 'Doctor not found'], 404);
         }

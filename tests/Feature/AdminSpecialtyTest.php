@@ -6,6 +6,8 @@ use App\Models\Specialty;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminSpecialtyTest extends TestCase
@@ -50,6 +52,26 @@ class AdminSpecialtyTest extends TestCase
         $this->assertDatabaseHas('specialty', ['name' => 'Cardiology']);
     }
 
+    public function test_admin_can_create_specialty_with_uploaded_image(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->post('/api/admin/specialties', [
+                'name' => 'Neurology',
+                'description' => 'Brain and nerve care',
+                'imageFile' => UploadedFile::fake()->create('neurology.jpg', 200, 'image/jpeg'),
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment(['name' => 'Neurology']);
+
+        $storedImagePath = $response->json('image');
+        $this->assertNotNull($storedImagePath);
+        $this->assertStringStartsWith('/storage/specialties/', $storedImagePath);
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $storedImagePath));
+    }
+
     public function test_admin_create_specialty_validation(): void
     {
         $response = $this->actingAs($this->admin, 'sanctum')
@@ -57,6 +79,20 @@ class AdminSpecialtyTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['name', 'description']);
+    }
+
+    public function test_admin_cannot_create_duplicate_specialty_name(): void
+    {
+        Specialty::factory()->create(['name' => 'Cardiology']);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/admin/specialties', [
+                'name' => 'Cardiology',
+                'description' => 'Duplicate should fail',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
     }
 
     public function test_admin_can_update_specialty(): void

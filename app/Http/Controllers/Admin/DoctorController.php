@@ -8,6 +8,7 @@ use App\Services\DoctorService;
 use App\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Models\Role;
 
 class DoctorController extends Controller
@@ -29,9 +30,11 @@ class DoctorController extends Controller
             'email' => 'required|string|email|unique:users',
             'password' => 'required|string|min:8',
             'image' => 'nullable|string',
+            'imageFile' => 'nullable|image|max:5120',
             'positionId' => 'nullable|string',
             'gender' => 'nullable|string',
             'phoneNumber' => 'nullable|string',
+            'isActive' => 'nullable|boolean',
             // DoctorInfor fields
             'priceId' => 'nullable|string',
             'provinceId' => 'nullable|string',
@@ -43,16 +46,22 @@ class DoctorController extends Controller
             'specialtyId' => 'nullable|integer|exists:specialty,id',
         ]);
 
+        $image = $validated['image'] ?? null;
+        if ($request->hasFile('imageFile')) {
+            $image = $this->storeDoctorImage($request);
+        }
+
         // Create User first
         $user = $this->userService->create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => $validated['password'],
-            'image' => $validated['image'] ?? null,
+            'image' => $image,
             'roleId' => 'R2', // Doctor Role
             'positionId' => $validated['positionId'] ?? null,
             'gender' => $validated['gender'] ?? null,
             'phoneNumber' => $validated['phoneNumber'] ?? null,
+            'isActive' => $validated['isActive'] ?? true,
         ]);
 
         if (Role::query()->where('name', 'R2')->exists()) {
@@ -81,9 +90,12 @@ class DoctorController extends Controller
         $validated = $request->validate([
             'name' => 'string|max:255',
             'image' => 'nullable|string',
+            'imageFile' => 'nullable|image|max:5120',
+            'removeImage' => 'nullable|boolean',
             'positionId' => 'nullable|string',
             'gender' => 'nullable|string',
             'phoneNumber' => 'nullable|string',
+            'isActive' => 'nullable|boolean',
             // DoctorInfor fields
             'priceId' => 'nullable|string',
             'provinceId' => 'nullable|string',
@@ -95,13 +107,38 @@ class DoctorController extends Controller
             'specialtyId' => 'nullable|integer|exists:specialty,id',
         ]);
 
-        $this->userService->update($id, array_filter([
-            'name' => $validated['name'] ?? null,
-            'image' => $validated['image'] ?? null,
-            'positionId' => $validated['positionId'] ?? null,
-            'gender' => $validated['gender'] ?? null,
-            'phoneNumber' => $validated['phoneNumber'] ?? null,
-        ]));
+        $userPayload = [];
+        if (array_key_exists('name', $validated)) {
+            $userPayload['name'] = $validated['name'];
+        }
+        if (array_key_exists('positionId', $validated)) {
+            $userPayload['positionId'] = $validated['positionId'];
+        }
+        if (array_key_exists('gender', $validated)) {
+            $userPayload['gender'] = $validated['gender'];
+        }
+        if (array_key_exists('phoneNumber', $validated)) {
+            $userPayload['phoneNumber'] = $validated['phoneNumber'];
+        }
+        if (array_key_exists('isActive', $validated)) {
+            $userPayload['isActive'] = (bool) $validated['isActive'];
+        }
+
+        $removeImage = ($validated['removeImage'] ?? false) && !$request->hasFile('imageFile');
+        if ($removeImage) {
+            $this->deleteDoctorImage($user->image);
+            $userPayload['image'] = null;
+        } elseif ($request->hasFile('imageFile')) {
+            $newImage = $this->storeDoctorImage($request);
+            $this->deleteDoctorImage($user->image);
+            $userPayload['image'] = $newImage;
+        } elseif (array_key_exists('image', $validated)) {
+            $userPayload['image'] = $validated['image'];
+        }
+
+        if (!empty($userPayload)) {
+            $this->userService->update($id, $userPayload);
+        }
 
         $dto = DoctorDTO::fromRequest($request->all(), $id);
         $this->doctorService->upsertDoctorInfor($dto);
@@ -116,5 +153,25 @@ class DoctorController extends Controller
         }
 
         return response()->json($this->doctorService->find($id));
+    }
+
+    private function storeDoctorImage(Request $request): string
+    {
+        $path = $request->file('imageFile')->store('doctors', 'public');
+        return "/storage/{$path}";
+    }
+
+    private function deleteDoctorImage(?string $imagePath): void
+    {
+        if (!$imagePath) {
+            return;
+        }
+
+        if (str_starts_with($imagePath, '/storage/')) {
+            $relativePath = substr($imagePath, strlen('/storage/'));
+            if ($relativePath !== '') {
+                Storage::disk('public')->delete($relativePath);
+            }
+        }
     }
 }

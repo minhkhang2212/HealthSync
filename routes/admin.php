@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\AllcodeController as AdminAllcodeController;
 use App\Http\Controllers\Admin\DoctorController;
 use App\Http\Controllers\Admin\ClinicController;
 use App\Http\Controllers\Admin\SpecialtyController;
+use App\Http\Controllers\Admin\BookingController;
 use App\Http\Controllers\Api\UserController; // Reusing original for users list
 
 Route::middleware(['auth:sanctum', 'role:R1'])->group(function () {
@@ -15,6 +16,9 @@ Route::middleware(['auth:sanctum', 'role:R1'])->group(function () {
 
     // Users
     Route::get('/users', [UserController::class, 'index']);
+
+    // Bookings
+    Route::get('/bookings', [BookingController::class, 'index']);
 
     // Clinics
     Route::post('/clinics', [ClinicController::class, 'store']);

@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import apiClient from '../../utils/apiClient';
+import apiClient, { getApiAssetBase } from '../../utils/apiClient';
 
 const initialForm = {
     firstName: '',
     lastName: '',
     email: '',
     phoneNumber: '',
-    image: '',
+    imageFile: null,
+    removeImage: false,
     gender: '',
     specialtyId: '',
     clinicId: '',
@@ -36,6 +37,65 @@ const buildErrorMessage = (error, fallback) => {
     return error?.response?.data?.message || fallback;
 };
 
+const splitDoctorName = (name = '') => {
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+        return { firstName: '', lastName: '' };
+    }
+
+    if (parts.length === 1) {
+        return { firstName: parts[0], lastName: '' };
+    }
+
+    return {
+        firstName: parts[0],
+        lastName: parts.slice(1).join(' '),
+    };
+};
+
+const resolveImageSource = (value, apiAssetBase) => {
+    if (!value || typeof value !== 'string') return '';
+    const trimmed = value.trim().replace(/\\/g, '/');
+    if (!trimmed) return '';
+    if (trimmed.startsWith('data:') || trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+    if (trimmed.startsWith('/')) return apiAssetBase ? `${apiAssetBase}${trimmed}` : trimmed;
+    if (trimmed.startsWith('storage/')) return apiAssetBase ? `${apiAssetBase}/${trimmed}` : `/${trimmed}`;
+    if (trimmed.startsWith('public/storage/')) {
+        const path = trimmed.replace(/^public/, '');
+        return apiAssetBase ? `${apiAssetBase}${path}` : path;
+    }
+    return `data:image/jpeg;base64,${trimmed}`;
+};
+
+const mapDoctorToForm = (doctor) => {
+    if (!doctor) {
+        return initialForm;
+    }
+
+    const { firstName, lastName } = splitDoctorName(doctor.name);
+    const doctorInfor = doctor.doctor_infor || doctor.doctorInfor || {};
+    const relations = doctor.doctor_clinic_specialties || doctor.doctorClinicSpecialties || [];
+    const relation = relations[0] || {};
+
+    return {
+        firstName,
+        lastName,
+        email: doctor.email || '',
+        phoneNumber: doctor.phoneNumber || '',
+        imageFile: null,
+        removeImage: false,
+        gender: doctor.gender || '',
+        specialtyId: relation.specialtyId ? String(relation.specialtyId) : relation.specialty?.id ? String(relation.specialty.id) : '',
+        clinicId: relation.clinicId ? String(relation.clinicId) : relation.clinic?.id ? String(relation.clinic.id) : '',
+        positionId: doctor.positionId || '',
+        priceId: doctorInfor.priceId || '',
+        paymentId: doctorInfor.paymentId || '',
+        provinceId: doctorInfor.provinceId || '',
+        note: doctorInfor.note || '',
+        password: 'password123',
+    };
+};
+
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB
 
 const NewDoctorModal = ({
@@ -44,7 +104,11 @@ const NewDoctorModal = ({
     clinics,
     specialties,
     onCreated,
+    onUpdated,
+    mode = 'create',
+    doctor = null,
 }) => {
+    const isEdit = mode === 'edit';
     const [formData, setFormData] = useState(initialForm);
     const [photoPreview, setPhotoPreview] = useState('');
     const [allcodes, setAllcodes] = useState({
@@ -56,6 +120,8 @@ const NewDoctorModal = ({
     const [allcodesLoading, setAllcodesLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+
+    const apiAssetBase = useMemo(() => getApiAssetBase(), []);
 
     useEffect(() => {
         if (!isOpen) {
@@ -94,6 +160,22 @@ const NewDoctorModal = ({
 
         loadAllcodes();
     }, [isOpen, allcodes]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        if (isEdit && doctor) {
+            setFormData(mapDoctorToForm(doctor));
+            setPhotoPreview(resolveImageSource(doctor.image, apiAssetBase));
+        } else {
+            setFormData(initialForm);
+            setPhotoPreview('');
+        }
+        setError('');
+        setSubmitting(false);
+    }, [isOpen, isEdit, doctor, apiAssetBase]);
 
     const selectedClinic = useMemo(
         () => clinics.find((item) => String(item.id) === String(formData.clinicId)),
@@ -137,14 +219,24 @@ const NewDoctorModal = ({
             return;
         }
 
+        // Store file immediately so submit can include it even if preview loading is still in progress.
+        setFormData((prev) => ({ ...prev, imageFile: file, removeImage: false }));
+        setError('');
+
         const reader = new FileReader();
         reader.onload = () => {
             const result = typeof reader.result === 'string' ? reader.result : '';
             setPhotoPreview(result);
-            setFormData((prev) => ({ ...prev, image: result }));
-            setError('');
+        };
+        reader.onerror = () => {
+            setPhotoPreview('');
         };
         reader.readAsDataURL(file);
+    };
+
+    const handleRemovePhoto = () => {
+        setPhotoPreview('');
+        setFormData((prev) => ({ ...prev, imageFile: null, removeImage: true }));
     };
 
     const handleSubmit = async (event) => {
@@ -155,8 +247,13 @@ const NewDoctorModal = ({
             return;
         }
 
-        if (!formData.email.trim() || !formData.password.trim()) {
+        if (!isEdit && (!formData.email.trim() || !formData.password.trim())) {
             setError('Email and password are required.');
+            return;
+        }
+
+        if (isEdit && !doctor?.id) {
+            setError('Doctor profile is invalid.');
             return;
         }
 
@@ -164,29 +261,56 @@ const NewDoctorModal = ({
         setError('');
 
         try {
-            const payload = {
-                name: `${formData.firstName} ${formData.lastName}`.trim(),
-                email: formData.email.trim(),
-                password: formData.password,
-                image: formData.image || null,
-                positionId: formData.positionId || null,
-                gender: formData.gender || null,
-                phoneNumber: formData.phoneNumber || null,
-                priceId: formData.priceId || null,
-                provinceId: formData.provinceId || null,
-                paymentId: formData.paymentId || null,
-                addressClinic: selectedClinic?.address || null,
-                nameClinic: selectedClinic?.name || null,
-                note: formData.note || null,
-                clinicId: formData.clinicId ? Number(formData.clinicId) : null,
-                specialtyId: formData.specialtyId ? Number(formData.specialtyId) : null,
-            };
+            const payload = new FormData();
+            payload.append('name', `${formData.firstName} ${formData.lastName}`.trim());
 
-            const response = await apiClient.post('/admin/doctors', payload);
-            onCreated(response.data);
+            if (!isEdit) {
+                payload.append('email', formData.email.trim());
+                payload.append('password', formData.password);
+            }
+
+            if (formData.imageFile) {
+                payload.append('imageFile', formData.imageFile);
+            } else if (isEdit && formData.removeImage) {
+                payload.append('removeImage', '1');
+            }
+
+            if (formData.positionId) payload.append('positionId', formData.positionId);
+            if (formData.gender) payload.append('gender', formData.gender);
+            if (formData.phoneNumber) payload.append('phoneNumber', formData.phoneNumber);
+            if (formData.priceId) payload.append('priceId', formData.priceId);
+            if (formData.provinceId) payload.append('provinceId', formData.provinceId);
+            if (formData.paymentId) payload.append('paymentId', formData.paymentId);
+            if (selectedClinic?.address) payload.append('addressClinic', selectedClinic.address);
+            if (selectedClinic?.name) payload.append('nameClinic', selectedClinic.name);
+            if (formData.note) payload.append('note', formData.note);
+            if (formData.clinicId) payload.append('clinicId', String(Number(formData.clinicId)));
+            if (formData.specialtyId) payload.append('specialtyId', String(Number(formData.specialtyId)));
+
+            let response;
+            if (isEdit) {
+                payload.append('_method', 'PATCH');
+                response = await apiClient.post(`/admin/doctors/${doctor.id}`, payload, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+            } else {
+                response = await apiClient.post('/admin/doctors', payload, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+            }
+
+            if (isEdit) {
+                onUpdated?.(response.data);
+            } else {
+                onCreated?.(response.data);
+            }
             handleClose();
         } catch (submitError) {
-            setError(buildErrorMessage(submitError, 'Failed to create doctor account.'));
+            setError(buildErrorMessage(submitError, isEdit ? 'Failed to update doctor profile.' : 'Failed to create doctor account.'));
             setSubmitting(false);
         }
     };
@@ -200,8 +324,8 @@ const NewDoctorModal = ({
             <div className="mx-auto my-8 w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <div className="flex items-start justify-between border-b border-slate-200 px-8 py-6">
                     <div>
-                        <h2 className="text-4xl font-black tracking-tight text-slate-900">Add New Doctor</h2>
-                        <p className="text-slate-500 mt-2">Register a new medical professional to the system.</p>
+                        <h2 className="text-4xl font-black tracking-tight text-slate-900">{isEdit ? 'Edit Doctor Profile' : 'Add New Doctor'}</h2>
+                        <p className="text-slate-500 mt-2">{isEdit ? 'Update profile information for this doctor.' : 'Register a new medical professional to the system.'}</p>
                     </div>
                     <button onClick={handleClose} className="text-slate-400 hover:text-slate-700 transition-colors" type="button">
                         <span className="material-symbols-outlined text-3xl">close</span>
@@ -227,7 +351,7 @@ const NewDoctorModal = ({
                                     )}
                                 </div>
                                 <label htmlFor="doctor-photo-input" className="mt-2 text-center lg:text-left text-sm font-semibold text-primary cursor-pointer block">
-                                    Upload Photo
+                                    {isEdit ? 'Change Photo' : 'Upload Photo'}
                                 </label>
                                 <input
                                     id="doctor-photo-input"
@@ -236,6 +360,15 @@ const NewDoctorModal = ({
                                     onChange={handlePhotoChange}
                                     className="hidden"
                                 />
+                                {isEdit && photoPreview && (
+                                    <button
+                                        type="button"
+                                        onClick={handleRemovePhoto}
+                                        className="mt-2 text-xs font-semibold text-rose-600 hover:text-rose-700"
+                                    >
+                                        Remove current photo
+                                    </button>
+                                )}
                             </div>
                             <div className="lg:col-span-9 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -247,17 +380,19 @@ const NewDoctorModal = ({
                                     <input name="lastName" value={formData.lastName} onChange={handleChange} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-primary" placeholder="e.g. Scott" />
                                 </div>
                                 <div>
-                                    <label className="text-sm font-semibold text-slate-700 mb-1 block">Email Address *</label>
-                                    <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-primary" placeholder="doctor@hospital.com" />
+                                    <label className="text-sm font-semibold text-slate-700 mb-1 block">Email Address {isEdit ? '' : '*'}</label>
+                                    <input type="email" name="email" value={formData.email} onChange={handleChange} disabled={isEdit} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-70" placeholder="doctor@hospital.com" />
                                 </div>
                                 <div>
                                     <label className="text-sm font-semibold text-slate-700 mb-1 block">Phone Number</label>
                                     <input name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-primary" placeholder="+1 (555) 000-0000" />
                                 </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-sm font-semibold text-slate-700 mb-1 block">Temporary Password *</label>
-                                    <input name="password" value={formData.password} onChange={handleChange} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-primary" placeholder="password123" />
-                                </div>
+                                {!isEdit && (
+                                    <div className="md:col-span-2">
+                                        <label className="text-sm font-semibold text-slate-700 mb-1 block">Temporary Password *</label>
+                                        <input name="password" value={formData.password} onChange={handleChange} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-slate-900 outline-none focus:border-primary" placeholder="password123" />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -350,7 +485,7 @@ const NewDoctorModal = ({
                             Cancel
                         </button>
                         <button type="submit" disabled={submitting} className="rounded-lg bg-primary px-6 py-2.5 font-bold text-white disabled:opacity-60">
-                            {submitting ? 'Creating...' : 'Create Doctor Account'}
+                            {isEdit ? (submitting ? 'Saving...' : 'Save Profile') : (submitting ? 'Creating...' : 'Create Doctor Account')}
                         </button>
                     </div>
                 </form>

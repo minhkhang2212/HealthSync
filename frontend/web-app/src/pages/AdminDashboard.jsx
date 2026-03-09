@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchClinics } from '../store/slices/clinicSlice';
@@ -6,6 +6,7 @@ import { fetchSpecialties } from '../store/slices/specialtySlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
 import { logoutUser } from '../store/slices/authSlice';
 import apiClient from '../utils/apiClient';
+import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 import NewDoctorModal from '../components/admin/NewDoctorModal';
 
 const navItems = [
@@ -16,10 +17,38 @@ const navItems = [
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const bookingStatusMap = {
-    S1: 'text-blue-700 bg-blue-100',
-    S2: 'text-red-700 bg-red-100',
-    S3: 'text-emerald-700 bg-emerald-100',
-    S4: 'text-amber-700 bg-amber-100',
+    S1: { chipClass: 'text-blue-700 bg-blue-100', dateClass: 'bg-blue-100 text-primary' },
+    S2: { chipClass: 'text-red-700 bg-red-100', dateClass: 'bg-red-100 text-red-600' },
+    S3: { chipClass: 'text-emerald-700 bg-emerald-100', dateClass: 'bg-blue-100 text-primary' },
+    S4: { chipClass: 'text-amber-700 bg-amber-100', dateClass: 'bg-blue-100 text-primary' },
+};
+
+const DEFAULT_STATUS_LABELS = {
+    S1: 'New',
+    S2: 'Cancelled',
+    S3: 'Done',
+    S4: 'No-show',
+};
+
+const DEFAULT_TIME_LABELS = {
+    T1: '8:00 AM - 9:00 AM',
+    T2: '9:00 AM - 10:00 AM',
+    T3: '10:00 AM - 11:00 AM',
+    T4: '11:00 AM - 12:00 PM',
+    T5: '1:00 PM - 2:00 PM',
+    T6: '2:00 PM - 3:00 PM',
+    T7: '3:00 PM - 4:00 PM',
+    T8: '4:00 PM - 5:00 PM',
+};
+
+const getBookingDateParts = (date) => {
+    const parsed = new Date(`${date}T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return { month: '---', day: '--' };
+
+    return {
+        month: parsed.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+        day: parsed.toLocaleDateString('en-GB', { day: '2-digit' }),
+    };
 };
 
 const StatCard = ({ title, icon, value, note, iconClass = 'bg-primary/10 text-primary' }) => (
@@ -48,7 +77,12 @@ const AdminDashboard = () => {
     const [search, setSearch] = useState('');
     const [bookingState, setBookingState] = useState({ loading: false, total: null, recent: [] });
     const [isNewDoctorOpen, setIsNewDoctorOpen] = useState(false);
+    const [isEditDoctorOpen, setIsEditDoctorOpen] = useState(false);
+    const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [doctorActionId, setDoctorActionId] = useState(null);
     const [doctorNotice, setDoctorNotice] = useState('');
+    const [statusLabels, setStatusLabels] = useState(DEFAULT_STATUS_LABELS);
+    const [timeLabels, setTimeLabels] = useState(DEFAULT_TIME_LABELS);
 
     const loadUsers = useCallback(async () => {
         setUsersLoading(true);
@@ -67,8 +101,10 @@ const AdminDashboard = () => {
     useEffect(() => {
         if (clinics.length === 0) dispatch(fetchClinics());
         if (specialties.length === 0) dispatch(fetchSpecialties());
-        if (doctors.length === 0) dispatch(fetchDoctors());
-    }, [dispatch, clinics.length, specialties.length, doctors.length]);
+        if (!doctorsLoading && doctors.length === 0) {
+            dispatch(fetchDoctors({ admin: true }));
+        }
+    }, [dispatch, clinics.length, specialties.length, doctorsLoading, doctors.length]);
 
     useEffect(() => {
         loadUsers();
@@ -82,12 +118,55 @@ const AdminDashboard = () => {
                 const payload = response.data?.data ?? response.data;
                 const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
                 const total = Array.isArray(payload) ? payload.length : payload?.total ?? rows.length;
-                setBookingState({ loading: false, total, recent: rows.slice(0, 3) });
+                setBookingState({ loading: false, total, recent: rows.slice(0, 6) });
             } catch {
                 setBookingState({ loading: false, total: null, recent: [] });
             }
         };
         loadBookings();
+    }, []);
+
+    useEffect(() => {
+        const loadCodeLabels = async () => {
+            try {
+                const cachedStatus = readAllcodeCache('STATUS');
+                const cachedTime = readAllcodeCache('TIME');
+
+                const [statusRes, timeRes] = await Promise.all([
+                    cachedStatus
+                        ? Promise.resolve({ data: cachedStatus })
+                        : apiClient.get('/allcodes', { params: { type: 'STATUS' } }),
+                    cachedTime
+                        ? Promise.resolve({ data: cachedTime })
+                        : apiClient.get('/allcodes', { params: { type: 'TIME' } }),
+                ]);
+
+                if (!cachedStatus && Array.isArray(statusRes.data)) {
+                    writeAllcodeCache('STATUS', statusRes.data);
+                }
+                if (!cachedTime && Array.isArray(timeRes.data)) {
+                    writeAllcodeCache('TIME', timeRes.data);
+                }
+
+                const nextStatus = { ...DEFAULT_STATUS_LABELS };
+                const nextTime = { ...DEFAULT_TIME_LABELS };
+
+                for (const item of statusRes.data || []) {
+                    if (item?.key) nextStatus[item.key] = item.valueEn || item.key;
+                }
+                for (const item of timeRes.data || []) {
+                    if (item?.key) nextTime[item.key] = item.valueEn || item.key;
+                }
+
+                setStatusLabels(nextStatus);
+                setTimeLabels(nextTime);
+            } catch {
+                setStatusLabels(DEFAULT_STATUS_LABELS);
+                setTimeLabels(DEFAULT_TIME_LABELS);
+            }
+        };
+
+        loadCodeLabels();
     }, []);
 
     useEffect(() => {
@@ -99,9 +178,38 @@ const AdminDashboard = () => {
     const handleDoctorCreated = useCallback((doctor) => {
         const doctorName = doctor?.name ? `"${doctor.name}"` : 'account';
         setDoctorNotice(`Doctor ${doctorName} created successfully.`);
-        dispatch(fetchDoctors());
+        dispatch(fetchDoctors({ admin: true }));
         loadUsers();
     }, [dispatch, loadUsers]);
+
+    const handleDoctorUpdated = useCallback((doctor) => {
+        const doctorName = doctor?.name ? `"${doctor.name}"` : 'profile';
+        setDoctorNotice(`Doctor ${doctorName} updated successfully.`);
+        dispatch(fetchDoctors({ admin: true }));
+    }, [dispatch]);
+
+    const handleOpenEditDoctor = useCallback((doctor) => {
+        setSelectedDoctor(doctor);
+        setIsEditDoctorOpen(true);
+    }, []);
+
+    const handleToggleDoctorActive = useCallback(async (doctor) => {
+        const nextValue = !doctor.isActive;
+        if (!nextValue && !window.confirm(`Set doctor "${doctor.name}" as inactive? This doctor will be hidden from Patient Dashboard.`)) {
+            return;
+        }
+
+        setDoctorActionId(doctor.id);
+        try {
+            await apiClient.patch(`/admin/doctors/${doctor.id}`, { isActive: nextValue });
+            setDoctorNotice(`Doctor "${doctor.name}" is now ${nextValue ? 'active' : 'inactive'}.`);
+            dispatch(fetchDoctors({ admin: true }));
+        } catch (toggleError) {
+            setUsersError(toggleError.response?.data?.message || 'Failed to update doctor status.');
+        } finally {
+            setDoctorActionId(null);
+        }
+    }, [dispatch]);
 
     const clinicNames = useMemo(() => Object.fromEntries(clinics.map((c) => [String(c.id), c.name])), [clinics]);
     const specialtyNames = useMemo(() => Object.fromEntries(specialties.map((s) => [String(s.id), s.name])), [specialties]);
@@ -111,13 +219,29 @@ const AdminDashboard = () => {
         const rel = relations[0];
         const clinicId = rel?.clinicId ?? rel?.clinic_id;
         const specialtyId = rel?.specialtyId ?? rel?.specialty_id;
+        const isActive = doctor.isActive !== false;
+        const hasProfile = Boolean(doctorInfor);
+
+        let statusText = 'Pending Setup';
+        let statusClass = 'text-amber-700 bg-amber-100';
+        if (!isActive) {
+            statusText = 'Inactive';
+            statusClass = 'text-rose-700 bg-rose-100';
+        } else if (hasProfile) {
+            statusText = 'Active';
+            statusClass = 'text-emerald-700 bg-emerald-100';
+        }
+
         return {
             id: doctor.id,
             name: doctor.name || 'Unknown',
             email: doctor.email || 'No email',
             clinic: rel?.clinic?.name || clinicNames[String(clinicId)] || doctorInfor?.nameClinic || doctorInfor?.name_clinic || 'Not assigned',
             specialty: rel?.specialty?.name || specialtyNames[String(specialtyId)] || 'General',
-            status: doctorInfor ? 'Active' : 'Pending',
+            isActive,
+            statusText,
+            statusClass,
+            raw: doctor,
         };
     }), [doctors, clinicNames, specialtyNames]);
 
@@ -126,6 +250,17 @@ const AdminDashboard = () => {
         if (!key) return rows;
         return rows.filter((item) => `${item.name} ${item.email} ${item.clinic} ${item.specialty}`.toLowerCase().includes(key));
     }, [rows, search]);
+
+    const doctorSpecialtyById = useMemo(() => {
+        const map = {};
+        for (const doctor of doctors) {
+            const relations = doctor.doctor_clinic_specialties || doctor.doctorClinicSpecialties || [];
+            const rel = relations[0];
+            const specialtyId = rel?.specialtyId ?? rel?.specialty_id;
+            map[String(doctor.id)] = rel?.specialty?.name || specialtyNames[String(specialtyId)] || 'General';
+        }
+        return map;
+    }, [doctors, specialtyNames]);
 
     const totalUsers = users.length;
     const totalAdmins = users.filter((item) => item.roleId === 'R1').length;
@@ -181,7 +316,7 @@ const AdminDashboard = () => {
 
                         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <StatCard title="Total Users" icon="groups" value={usersLoading ? '-' : totalUsers} note={`Admins: ${totalAdmins} | Doctors: ${totalDoctors} | Patients: ${totalPatients}`} />
-                            <StatCard title="Total Bookings" icon="calendar_month" value={bookingState.loading ? '-' : bookingState.total ?? '-'} note="Live when /api/admin/bookings exists." iconClass="bg-amber-100 text-amber-700" />
+                            <StatCard title="Total Bookings" icon="calendar_month" value={bookingState.loading ? '-' : bookingState.total ?? '-'} note="Live data from recent booking activity." iconClass="bg-amber-100 text-amber-700" />
                             <StatCard title="Active Clinics" icon="location_on" value={clinicsLoading ? '-' : clinics.length} note="Registered locations in system." iconClass="bg-emerald-100 text-emerald-700" />
                             <StatCard title="Total Revenue" icon="payments" value={revenue} note="Estimated by booking volume." />
                         </section>
@@ -190,14 +325,33 @@ const AdminDashboard = () => {
                             <h2 className="text-2xl font-black tracking-tight">User Management - Doctors</h2>
                             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                                 <table className="w-full min-w-[700px] text-left">
-                                    <thead className="border-b border-slate-200 bg-slate-50"><tr><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Doctor</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Specialty</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Clinic</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th></tr></thead>
+                                    <thead className="border-b border-slate-200 bg-slate-50"><tr><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Doctor</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Specialty</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Clinic</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th></tr></thead>
                                     <tbody className="divide-y divide-slate-200">
-                                        {doctorsLoading ? <tr><td colSpan={4} className="px-6 py-8 text-sm text-slate-500">Loading doctors...</td></tr> : filteredRows.slice(0, 6).map((doctor) => (
+                                        {doctorsLoading ? <tr><td colSpan={5} className="px-6 py-8 text-sm text-slate-500">Loading doctors...</td></tr> : filteredRows.map((doctor) => (
                                             <tr key={doctor.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-4"><p className="text-sm font-bold">{doctor.name}</p><p className="text-xs text-slate-500">{doctor.email}</p></td>
                                                 <td className="px-6 py-4"><span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">{doctor.specialty}</span></td>
                                                 <td className="px-6 py-4 text-sm text-slate-600">{doctor.clinic}</td>
-                                                <td className="px-6 py-4 text-xs font-bold text-emerald-600">{doctor.status}</td>
+                                                <td className="px-6 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${doctor.statusClass}`}>{doctor.statusText}</span></td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenEditDoctor(doctor.raw)}
+                                                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-primary hover:text-primary"
+                                                        >
+                                                            Edit Profile
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleToggleDoctorActive(doctor)}
+                                                            disabled={doctorActionId === doctor.id}
+                                                            className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60 ${doctor.isActive ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                                                        >
+                                                            {doctorActionId === doctor.id ? 'Saving...' : doctor.isActive ? 'Set Inactive' : 'Activate'}
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -206,20 +360,52 @@ const AdminDashboard = () => {
                         </section>
 
                         <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                            <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h2 className="text-xl font-black">Booking Management</h2>
-                                <div className="mt-4 space-y-3">
+                            <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <h2 className="text-lg font-black">Booking Management</h2>
+                                <div className="mt-3 space-y-2.5">
                                     {bookingState.loading ? <p className="text-sm text-slate-500">Loading bookings...</p> : bookingState.recent.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No booking feed yet. Add GET /api/admin/bookings to show records here.</p> : bookingState.recent.map((item) => {
-                                        const status = item.statusId || item.status || 'S1';
-                                        const cls = bookingStatusMap[status] || 'text-slate-700 bg-slate-100';
+                                        const statusKey = item.statusId || item.status || 'S1';
+                                        const statusTheme = bookingStatusMap[statusKey] || { chipClass: 'text-slate-700 bg-slate-100', dateClass: 'bg-slate-200 text-slate-600' };
+                                        const patientName = item.patient?.name || `Patient #${item.patientId || '--'}`;
+                                        const doctorName = item.doctor?.name || `Doctor #${item.doctorId || '--'}`;
+                                        const specialtyName = doctorSpecialtyById[String(item.doctorId)] || 'General';
+                                        const timeText = timeLabels[item.timeType] || item.timeType || '--';
+                                        const statusText = statusLabels[statusKey] || statusKey;
+                                        const dateParts = getBookingDateParts(item.date);
                                         return (
-                                            <div key={item.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                                                <div><p className="text-sm font-bold">Patient #{item.patientId || '--'}</p><p className="text-xs text-slate-500">Doctor #{item.doctorId || '--'} | {item.date || '--'} | {item.timeType || '--'}</p></div>
-                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${cls}`}>{status}</span>
+                                            <div key={item.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2.5 sm:px-3">
+                                                <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${statusTheme.dateClass}`}>
+                                                    <div className="text-center leading-none">
+                                                        <p className="text-[9px] font-black tracking-wide">{dateParts.month}</p>
+                                                        <p className="mt-0.5 text-[20px] font-black">{Number.parseInt(dateParts.day, 10) || dateParts.day}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-sm font-black sm:text-base">Patient: {patientName}</p>
+                                                    <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">{doctorName} • {specialtyName}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="text-right">
+                                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${statusTheme.chipClass}`}>
+                                                            {String(statusText).toUpperCase()}
+                                                        </span>
+                                                        <p className="mt-1 text-[11px] font-bold text-slate-400">{timeText}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-full p-0.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+                                                        aria-label="Booking options"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[16px]">more_vert</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         );
                                     })}
                                 </div>
+                                <button type="button" className="mt-3 w-full border-t border-slate-200 pt-3 text-center text-sm font-black text-primary hover:text-blue-700">
+                                    View Full Booking Calendar
+                                </button>
                             </div>
 
                             <div className="space-y-3">
@@ -252,8 +438,22 @@ const AdminDashboard = () => {
                 specialties={specialties}
                 onCreated={handleDoctorCreated}
             />
+            <NewDoctorModal
+                isOpen={isEditDoctorOpen}
+                onClose={() => {
+                    setIsEditDoctorOpen(false);
+                    setSelectedDoctor(null);
+                }}
+                clinics={clinics}
+                specialties={specialties}
+                mode="edit"
+                doctor={selectedDoctor}
+                onUpdated={handleDoctorUpdated}
+            />
         </div>
     );
 };
 
 export default AdminDashboard;
+
+

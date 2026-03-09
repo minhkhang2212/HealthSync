@@ -6,6 +6,8 @@ use App\Models\Clinic;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminClinicTest extends TestCase
@@ -51,6 +53,26 @@ class AdminClinicTest extends TestCase
         $this->assertDatabaseHas('clinic', ['name' => 'Royal London Hospital']);
     }
 
+    public function test_admin_can_create_clinic_with_uploaded_image(): void
+    {
+        Storage::fake('public');
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->post('/api/admin/clinics', [
+                'name' => 'City Care Center',
+                'address' => '123 Baker St, London',
+                'description' => 'Community clinic with diagnostics',
+                'imageFile' => UploadedFile::fake()->create('clinic.jpg', 200, 'image/jpeg'),
+            ]);
+
+        $response->assertStatus(201);
+        $storedImagePath = $response->json('image');
+
+        $this->assertNotNull($storedImagePath);
+        $this->assertStringStartsWith('/storage/clinics/', $storedImagePath);
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $storedImagePath));
+    }
+
     public function test_admin_create_clinic_validation(): void
     {
         $response = $this->actingAs($this->admin, 'sanctum')
@@ -71,6 +93,30 @@ class AdminClinicTest extends TestCase
 
         $response->assertOk()
             ->assertJsonFragment(['name' => 'New Name']);
+    }
+
+    public function test_admin_can_update_clinic_with_uploaded_image(): void
+    {
+        Storage::fake('public');
+
+        $clinic = Clinic::factory()->create([
+            'image' => 'https://example.com/old-image',
+        ]);
+
+        $response = $this->actingAs($this->admin, 'sanctum')
+            ->post("/api/admin/clinics/{$clinic->id}", [
+                '_method' => 'PATCH',
+                'name' => 'Clinic With New Image',
+                'imageFile' => UploadedFile::fake()->create('updated.jpg', 200, 'image/jpeg'),
+            ]);
+
+        $response->assertOk()
+            ->assertJsonFragment(['name' => 'Clinic With New Image']);
+
+        $storedImagePath = $response->json('image');
+        $this->assertNotNull($storedImagePath);
+        $this->assertStringStartsWith('/storage/clinics/', $storedImagePath);
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $storedImagePath));
     }
 
     public function test_admin_can_delete_clinic(): void

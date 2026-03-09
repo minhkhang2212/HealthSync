@@ -11,6 +11,7 @@ import {
     saveDoctorSchedules,
 } from '../store/slices/scheduleSlice';
 import apiClient from '../utils/apiClient';
+import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 
 const TIME_CODES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'];
 
@@ -33,14 +34,24 @@ const DoctorDashboard = () => {
     const [actionLoading, setActionLoading] = React.useState(null);
 
     React.useEffect(() => {
-        dispatch(fetchDoctorSchedules());
-        dispatch(fetchDoctorBookings());
-    }, [dispatch]);
+        if (!loadingSchedules && schedules.length === 0) {
+            dispatch(fetchDoctorSchedules());
+        }
+        if (!loadingBookings && bookings.length === 0) {
+            dispatch(fetchDoctorBookings());
+        }
+    }, [dispatch, loadingSchedules, schedules.length, loadingBookings, bookings.length]);
 
     React.useEffect(() => {
         const loadTimeLabels = async () => {
             try {
-                const response = await apiClient.get('/allcodes', { params: { type: 'TIME' } });
+                const cached = readAllcodeCache('TIME');
+                const response = cached
+                    ? { data: cached }
+                    : await apiClient.get('/allcodes', { params: { type: 'TIME' } });
+                if (!cached && Array.isArray(response.data)) {
+                    writeAllcodeCache('TIME', response.data);
+                }
                 const labels = {};
                 for (const code of response.data) {
                     labels[code.key] = code.valueEn;

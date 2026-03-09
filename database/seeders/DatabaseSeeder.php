@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
                 'positionId' => null,
                 'gender' => null,
                 'phoneNumber' => '0700000000',
+                'isActive' => true,
             ],
             [
                 'name' => 'Dr John Carter',
@@ -42,6 +43,7 @@ class DatabaseSeeder extends Seeder
                 'positionId' => 'P0',
                 'gender' => 'M',
                 'phoneNumber' => '0700000001',
+                'isActive' => true,
             ],
             [
                 'name' => 'Dr Emily Stone',
@@ -51,6 +53,7 @@ class DatabaseSeeder extends Seeder
                 'positionId' => 'P1',
                 'gender' => 'F',
                 'phoneNumber' => '0700000002',
+                'isActive' => true,
             ],
             [
                 'name' => 'Patient Liam Brown',
@@ -60,6 +63,7 @@ class DatabaseSeeder extends Seeder
                 'positionId' => null,
                 'gender' => 'M',
                 'phoneNumber' => '0700000003',
+                'isActive' => true,
             ],
             [
                 'name' => 'Patient Olivia Green',
@@ -69,6 +73,7 @@ class DatabaseSeeder extends Seeder
                 'positionId' => null,
                 'gender' => 'F',
                 'phoneNumber' => '0700000004',
+                'isActive' => true,
             ],
         ];
 
@@ -82,6 +87,7 @@ class DatabaseSeeder extends Seeder
                     'positionId' => $data['positionId'],
                     'gender' => $data['gender'],
                     'phoneNumber' => $data['phoneNumber'],
+                    'isActive' => $data['isActive'] ?? true,
                 ]
             );
 

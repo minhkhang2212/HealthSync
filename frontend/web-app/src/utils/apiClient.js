@@ -1,8 +1,23 @@
 import axios from 'axios';
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
+export const getApiAssetBase = () => {
+    try {
+        const url = new URL(apiBaseUrl, window.location.origin);
+        let pathname = url.pathname.replace(/\/+$/, '');
+        if (pathname.endsWith('/api')) {
+            pathname = pathname.slice(0, -4);
+        }
+        return `${url.origin}${pathname}`;
+    } catch {
+        return '';
+    }
+};
+
 // The Laravel backend base URL
 const apiClient = axios.create({
-    baseURL: 'http://localhost:8000/api',
+    baseURL: apiBaseUrl,
     headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
