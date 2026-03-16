@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('key', 50);
             $table->string('type', 50);
             $table->string('valueEn', 255);
-            $table->string('valueVi', 255);
             $table->timestamps();
 
             $table->index('type');

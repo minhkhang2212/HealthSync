@@ -15,47 +15,47 @@ class AllcodeSeeder extends Seeder
     {
         $allcodes = [
             // STATUS
-            ['type' => 'STATUS', 'key' => 'S1', 'valueEn' => 'New', 'valueVi' => 'Lich hen moi'],
-            ['type' => 'STATUS', 'key' => 'S2', 'valueEn' => 'Cancelled', 'valueVi' => 'Da huy'],
-            ['type' => 'STATUS', 'key' => 'S3', 'valueEn' => 'Done', 'valueVi' => 'Da kham xong'],
-            ['type' => 'STATUS', 'key' => 'S4', 'valueEn' => 'No-show', 'valueVi' => 'Vang mat'],
+            ['type' => 'STATUS', 'key' => 'S1', 'valueEn' => 'New'],
+            ['type' => 'STATUS', 'key' => 'S2', 'valueEn' => 'Cancelled'],
+            ['type' => 'STATUS', 'key' => 'S3', 'valueEn' => 'Done'],
+            ['type' => 'STATUS', 'key' => 'S4', 'valueEn' => 'No-show'],
 
             // POSITION
-            ['type' => 'POSITION', 'key' => 'P0', 'valueEn' => 'Doctor', 'valueVi' => 'Bac si'],
-            ['type' => 'POSITION', 'key' => 'P1', 'valueEn' => 'Master', 'valueVi' => 'Thac si'],
-            ['type' => 'POSITION', 'key' => 'P2', 'valueEn' => 'PhD', 'valueVi' => 'Tien si'],
-            ['type' => 'POSITION', 'key' => 'P3', 'valueEn' => 'Associate Professor', 'valueVi' => 'Pho giao su'],
-            ['type' => 'POSITION', 'key' => 'P4', 'valueEn' => 'Professor', 'valueVi' => 'Giao su'],
+            ['type' => 'POSITION', 'key' => 'P0', 'valueEn' => 'Doctor'],
+            ['type' => 'POSITION', 'key' => 'P1', 'valueEn' => 'Master'],
+            ['type' => 'POSITION', 'key' => 'P2', 'valueEn' => 'PhD'],
+            ['type' => 'POSITION', 'key' => 'P3', 'valueEn' => 'Associate Professor'],
+            ['type' => 'POSITION', 'key' => 'P4', 'valueEn' => 'Professor'],
 
             // GENDER
-            ['type' => 'GENDER', 'key' => 'M', 'valueEn' => 'Male', 'valueVi' => 'Nam'],
-            ['type' => 'GENDER', 'key' => 'F', 'valueEn' => 'Female', 'valueVi' => 'Nu'],
-            ['type' => 'GENDER', 'key' => 'O', 'valueEn' => 'Other', 'valueVi' => 'Khac'],
+            ['type' => 'GENDER', 'key' => 'M', 'valueEn' => 'Male'],
+            ['type' => 'GENDER', 'key' => 'F', 'valueEn' => 'Female'],
+            ['type' => 'GENDER', 'key' => 'O', 'valueEn' => 'Other'],
 
             // ROLE
-            ['type' => 'ROLE', 'key' => 'R1', 'valueEn' => 'Admin', 'valueVi' => 'Quan tri vien'],
-            ['type' => 'ROLE', 'key' => 'R2', 'valueEn' => 'Doctor', 'valueVi' => 'Bac si'],
-            ['type' => 'ROLE', 'key' => 'R3', 'valueEn' => 'Patient', 'valueVi' => 'Benh nhan'],
+            ['type' => 'ROLE', 'key' => 'R1', 'valueEn' => 'Admin'],
+            ['type' => 'ROLE', 'key' => 'R2', 'valueEn' => 'Doctor'],
+            ['type' => 'ROLE', 'key' => 'R3', 'valueEn' => 'Patient'],
 
             // PRICE
-            ['type' => 'PRICE', 'key' => 'PRI1', 'valueEn' => '10 GBP', 'valueVi' => '250000'],
-            ['type' => 'PRICE', 'key' => 'PRI2', 'valueEn' => '15 GBP', 'valueVi' => '300000'],
-            ['type' => 'PRICE', 'key' => 'PRI3', 'valueEn' => '20 GBP', 'valueVi' => '400000'],
-            ['type' => 'PRICE', 'key' => 'PRI4', 'valueEn' => '25 GBP', 'valueVi' => '500000'],
-            ['type' => 'PRICE', 'key' => 'PRI5', 'valueEn' => '30 GBP', 'valueVi' => '600000'],
+            ['type' => 'PRICE', 'key' => 'PRI1', 'valueEn' => '10 GBP'],
+            ['type' => 'PRICE', 'key' => 'PRI2', 'valueEn' => '15 GBP'],
+            ['type' => 'PRICE', 'key' => 'PRI3', 'valueEn' => '20 GBP'],
+            ['type' => 'PRICE', 'key' => 'PRI4', 'valueEn' => '25 GBP'],
+            ['type' => 'PRICE', 'key' => 'PRI5', 'valueEn' => '30 GBP'],
 
             // PAYMENT
-            ['type' => 'PAYMENT', 'key' => 'PAY1', 'valueEn' => 'Cash', 'valueVi' => 'Tien mat'],
-            ['type' => 'PAYMENT', 'key' => 'PAY2', 'valueEn' => 'Credit Card', 'valueVi' => 'The ATM'],
-            ['type' => 'PAYMENT', 'key' => 'PAY3', 'valueEn' => 'All', 'valueVi' => 'Tat ca'],
+            ['type' => 'PAYMENT', 'key' => 'PAY1', 'valueEn' => 'Cash'],
+            ['type' => 'PAYMENT', 'key' => 'PAY2', 'valueEn' => 'Credit Card'],
+            ['type' => 'PAYMENT', 'key' => 'PAY3', 'valueEn' => 'All'],
 
             // PROVINCE
-            ['type' => 'PROVINCE', 'key' => 'PRO1', 'valueEn' => 'London', 'valueVi' => 'London'],
-            ['type' => 'PROVINCE', 'key' => 'PRO2', 'valueEn' => 'Manchester', 'valueVi' => 'Manchester'],
-            ['type' => 'PROVINCE', 'key' => 'PRO3', 'valueEn' => 'Birmingham', 'valueVi' => 'Birmingham'],
-            ['type' => 'PROVINCE', 'key' => 'PRO4', 'valueEn' => 'Leeds', 'valueVi' => 'Leeds'],
-            ['type' => 'PROVINCE', 'key' => 'PRO5', 'valueEn' => 'Bristol', 'valueVi' => 'Bristol'],
-            ['type' => 'PROVINCE', 'key' => 'PRO6', 'valueEn' => 'Liverpool', 'valueVi' => 'Liverpool'],
+            ['type' => 'PROVINCE', 'key' => 'PRO1', 'valueEn' => 'London'],
+            ['type' => 'PROVINCE', 'key' => 'PRO2', 'valueEn' => 'Manchester'],
+            ['type' => 'PROVINCE', 'key' => 'PRO3', 'valueEn' => 'Birmingham'],
+            ['type' => 'PROVINCE', 'key' => 'PRO4', 'valueEn' => 'Leeds'],
+            ['type' => 'PROVINCE', 'key' => 'PRO5', 'valueEn' => 'Bristol'],
+            ['type' => 'PROVINCE', 'key' => 'PRO6', 'valueEn' => 'Liverpool'],
         ];
 
         $allcodes = array_merge(

@@ -29,6 +29,7 @@ vi.mock('../../store/slices/doctorSlice', async () => {
 
 vi.mock('../../utils/apiClient', () => ({
     __esModule: true,
+    getApiAssetBase: vi.fn(() => ''),
     default: {
         get: vi.fn(() => Promise.resolve({ data: { data: [] } })),
         post: vi.fn(() => Promise.resolve({ data: {} })),

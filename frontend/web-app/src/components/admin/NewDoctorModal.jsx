@@ -26,7 +26,7 @@ const sectionTitle = (title) => (
     </h3>
 );
 
-const getAllcodeLabel = (item) => item?.valueEn || item?.valueVi || item?.key || '';
+const getAllcodeLabel = (item) => item?.valueEn || item?.key || '';
 
 const buildErrorMessage = (error, fallback) => {
     const errors = error?.response?.data?.errors;

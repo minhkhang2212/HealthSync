@@ -15,7 +15,6 @@ class AllcodeController extends Controller
             'type' => 'required|string|max:50',
             'key' => 'required|string|max:50',
             'valueEn' => 'required|string|max:255',
-            'valueVi' => 'required|string|max:255',
         ]);
 
         $allcode = Allcode::create($validated);
@@ -34,7 +33,6 @@ class AllcodeController extends Controller
             'type' => 'sometimes|string|max:50',
             'key' => 'sometimes|string|max:50',
             'valueEn' => 'sometimes|string|max:255',
-            'valueVi' => 'sometimes|string|max:255',
         ]);
 
         $allcode->update($validated);

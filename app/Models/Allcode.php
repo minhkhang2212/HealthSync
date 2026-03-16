@@ -15,6 +15,5 @@ class Allcode extends Model
         'key',
         'type',
         'valueEn',
-        'valueVi',
     ];
 }

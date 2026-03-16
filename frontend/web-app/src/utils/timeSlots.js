@@ -23,7 +23,6 @@ const createSlots = () => {
             slots.push({
                 key: `T${index}`,
                 valueEn: `${to12HourLabel(startHour, startMinute)} - ${to12HourLabel(endHour, endMinute)}`,
-                valueVi: `${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')} - ${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`,
             });
             index += 1;
         }

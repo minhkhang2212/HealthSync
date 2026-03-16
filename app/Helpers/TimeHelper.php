@@ -69,7 +69,6 @@ class TimeHelper
                 'type' => 'TIME',
                 'key' => "T{$index}",
                 'valueEn' => "{$cursor->format('g:i A')} - {$next->format('g:i A')}",
-                'valueVi' => "{$cursor->format('H:i')} - {$next->format('H:i')}",
             ];
             $cursor = $next;
             $index++;
