@@ -40,10 +40,15 @@ class BookingService
         return $this->bookingRepository->getByDoctorId($doctorId);
     }
 
+    public function getByDoctorIdForDate(int $doctorId, ?string $date = null): Collection
+    {
+        return $this->bookingRepository->getByDoctorId($doctorId, $date);
+    }
+
     public function createBooking(BookingDTO $dto): Booking
     {
         if (!TimeHelper::isBookingWindowValid($dto->date, $dto->timeType)) {
-            throw new Exception("Invalid booking window. Allowed range is Today to Today + 2 days.");
+            throw new Exception("Invalid booking window. Allowed range is Today to Today + 30 days.");
         }
 
         return DB::transaction(function () use ($dto) {
@@ -85,9 +90,9 @@ class BookingService
             // 2. Check capacity
             $this->preventOverbooking($lockedSchedule);
 
-            // 3. Increment currentNumber in schedule
+            // 3. Mark the slot as occupied
             $this->scheduleRepository->update($lockedSchedule->id, [
-                'currentNumber' => $lockedSchedule->currentNumber + 1
+                'currentNumber' => 1,
             ]);
 
             // 4. Create the booking
@@ -116,7 +121,7 @@ class BookingService
             throw new Exception("Booking not found.");
         }
 
-        if (in_array($booking->statusId, ['S2', 'S3', 'S4'], true)) {
+        if ($booking->confirmedAt !== null || in_array($booking->statusId, ['S2', 'S3', 'S4'], true)) {
             throw new Exception("Booking cannot be cancelled from the current status.");
         }
 
@@ -129,7 +134,7 @@ class BookingService
             // Update booking status to 'S2' (Cancelled)
             $this->bookingRepository->update($booking->id, ['statusId' => 'S2']);
 
-            // Decrease current number in schedule
+            // Re-open the slot when the booking is cancelled
             $lockedSchedule = $this->scheduleRepository->findByDoctorAndSlotForUpdate(
                 $booking->doctorId,
                 $booking->date,
@@ -139,7 +144,7 @@ class BookingService
             if ($lockedSchedule) {
                 if ($lockedSchedule->currentNumber > 0) {
                     $this->scheduleRepository->update($lockedSchedule->id, [
-                        'currentNumber' => $lockedSchedule->currentNumber - 1
+                        'currentNumber' => 0,
                     ]);
                 }
             }
@@ -153,10 +158,68 @@ class BookingService
         });
     }
 
+    public function confirmBooking(int $id, ?string $confirmationAttachment = null): Booking
+    {
+        $booking = $this->find($id);
+        if (!$booking) {
+            throw new RuntimeException("Booking not found.");
+        }
+
+        if ($booking->statusId !== 'S1') {
+            throw new RuntimeException("Only new bookings can be confirmed.");
+        }
+
+        if ($booking->confirmedAt !== null) {
+            throw new RuntimeException("Booking has already been confirmed.");
+        }
+
+        $payload = [
+            'confirmedAt' => now('Europe/London'),
+        ];
+
+        if ($confirmationAttachment !== null) {
+            $payload['confirmationAttachment'] = $confirmationAttachment;
+        }
+
+        return $this->update($id, $payload);
+    }
+
+    public function sendPrescription(int $id, string $prescriptionAttachment): Booking
+    {
+        $booking = $this->find($id);
+        if (!$booking) {
+            throw new RuntimeException("Booking not found.");
+        }
+
+        if ($booking->statusId !== 'S1' || $booking->confirmedAt === null) {
+            throw new RuntimeException("Booking must be confirmed before sending prescription.");
+        }
+
+        return $this->update($id, [
+            'statusId' => 'S3',
+            'prescriptionSentAt' => now('Europe/London'),
+            'prescriptionAttachment' => $prescriptionAttachment,
+        ]);
+    }
+
+    public function markNoShowByDoctor(int $id): Booking
+    {
+        $booking = $this->find($id);
+        if (!$booking) {
+            throw new RuntimeException("Booking not found.");
+        }
+
+        if ($booking->statusId !== 'S1' || $booking->confirmedAt === null) {
+            throw new RuntimeException("Booking must be confirmed before marking no-show.");
+        }
+
+        return $this->update($id, ['statusId' => 'S4']);
+    }
+
     private function preventOverbooking($schedule): void
     {
         if ($schedule->currentNumber >= 1) {
-            throw new Exception("This time slot is fully booked.");
+            throw new Exception("This time slot is already booked.");
         }
     }
 }

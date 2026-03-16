@@ -1,16 +1,15 @@
-
 # Doctor Appointment Booking Platform (HealthSync)
 
 ## 1. Project Overview
 
-Doctor Appointment Booking Platform (HealthSync) là hệ thống web cho phép **bệnh nhân đặt lịch khám bác sĩ online**.
+HealthSync là hệ thống web cho phép **bệnh nhân đặt lịch khám bác sĩ online**, bác sĩ quản lý lịch làm việc theo ngày, và admin quản lý dữ liệu vận hành của toàn hệ thống.
 
-### Mục tiêu
+### Product Goals
 
 - Giảm thời gian chờ tại phòng khám
-- Giúp bác sĩ quản lý lịch khám
-- Quản lý bệnh nhân
-- Lưu trữ lịch sử khám bệnh
+- Cho phép bệnh nhân tự đặt lịch online
+- Cho phép bác sĩ đóng/mở slot khám theo ngày
+- Quản lý clinic, specialty, doctor profile và booking history
 
 ### Target Location
 
@@ -19,65 +18,62 @@ Doctor Appointment Booking Platform (HealthSync) là hệ thống web cho phép 
 
 ---
 
-# 2. User Roles
+## 2. User Roles
 
 | Role | Description |
-|-----|-------------|
+|------|-------------|
 | Admin | Quản lý toàn hệ thống |
-| Doctor | Quản lý lịch khám và bệnh nhân |
-| Patient | Đặt lịch khám |
+| Doctor | Quản lý availability và xử lý lịch khám |
+| Patient | Tìm bác sĩ và đặt lịch khám |
 
 ---
 
-# 3. MVP Scope
+## 3. MVP Scope
 
-## Included (MVP)
+### Included
 
 - Authentication
 - Doctor profile
 - Clinic management
 - Specialty management
-- Doctor schedule
+- Doctor availability management
 - Appointment booking
 - Appointment cancellation
 - Appointment history
+- Master data via allcodes
 
-## Excluded (Phase 2)
+### Excluded
 
 - Online payment
 - Email/SMS reminder
 - Video consultation
-- Multi-clinic doctors
 - AI medical assistant
 
 ---
 
-# 4. Core Modules
+## 4. Core Modules
 
 | Module | Description |
-|------|-------------|
-| User Authentication | Quản lý đăng nhập & role |
-| Doctor Profile | Thông tin bác sĩ |
+|--------|-------------|
+| User Authentication | Đăng ký, đăng nhập, phân quyền |
+| Doctor Profile | Hồ sơ bác sĩ và thông tin chuyên môn |
 | Clinic | Quản lý phòng khám |
 | Specialty | Quản lý chuyên khoa |
-| Schedule | Slot lịch khám |
+| Schedule | Quản lý slot khả dụng theo ngày |
 | Booking | Đặt lịch khám |
-| History | Lịch sử khám |
-| Allcodes | Master data |
+| History | Lưu kết quả khám |
+| Allcodes | Master data cho role, status, time, price, payment, province |
 
 ---
 
-# 5. Booking Flow
+## 5. Booking Flow
 
-## Patient Booking Flow
+### Patient Booking Flow
 
-```
-
+```text
 Login
 ↓
-Choose specialty
-↓
-Choose doctor
+Choose specialty / clinic / doctor
 ↓
 Choose date
 ↓
@@ -86,357 +82,343 @@ Choose time slot
 Confirm booking
 ↓
 Booking created
-
 ```
 
----
+### Doctor Daily Availability Flow
 
-## Doctor Create Schedule Flow
-
-```
-
+```text
 Doctor login
 ↓
 Select date
 ↓
-Select time slots
+Review all 16 slots (all selected by default)
 ↓
-Set max patients
+Deselect slots that should be closed
 ↓
-Save schedule
-
+Save availability
 ```
 
 ---
 
-# 6. Booking Rules
+## 6. Booking Rules
 
-## Booking Window
+### Booking Window
 
 Patient chỉ được đặt lịch trong khoảng:
 
-```
-
-Today → Today + 2 days
-
+```text
+Today → Today + 30 days
 ```
 
 Timezone hệ thống:
 
-```
-
+```text
 Europe/London
-
 ```
 
 Không cho phép:
 
 - Đặt lịch trong quá khứ
-- Đặt lịch khi slot đã đầy
+- Đặt lịch ngoài booking window
+- Đặt lịch vào slot đã bị doctor đóng
+- Đặt lịch vào slot đã có bệnh nhân khác book
 
----
+### Doctor Availability Rule
 
-## Doctor Cancellation Rule
+- Mỗi ngày mặc định có sẵn 16 slot
+- Tất cả slot mặc định ở trạng thái open
+- Doctor chỉ cần **deselect** các slot muốn disable
+- Slot đã có booking thì không được disable
+
+### Doctor Cancellation Rule
 
 Doctor chỉ được hủy lịch nếu:
 
-```
-
+```text
 Appointment time − current time ≥ 24 hours
-
 ```
+
+### Slot Capacity Rule
+
+```text
+1 slot = 1 patient
+```
+
+Không có `maxNumber` cho mỗi slot nữa. `currentNumber` chỉ dùng để biểu diễn:
+
+- `0` = slot đang trống
+- `1` = slot đã có người đặt
 
 ---
 
-# 7. Booking Status
+## 7. Booking Status
 
 | Code | Meaning |
-|-----|--------|
+|------|---------|
 | S1 | New |
 | S2 | Cancelled |
 | S3 | Done |
 | S4 | No-show |
 
+`Confirmed` is an operational step, not a separate status code. A booking is treated as confirmed when `confirmedAt` is set while `statusId` remains `S1`. It only becomes `S3` after the doctor sends the prescription.
+
 ---
 
-# 8. Time Slot Definition
+## 8. Time Slot Definition
 
-Time slot cố định toàn hệ thống.
+Mỗi ngày có **16 slots**, mỗi slot dài **30 phút**.
 
 | Code | Time |
-|----|------|
-| T1 | 08:00 |
-| T2 | 09:00 |
-| T3 | 10:00 |
-| T4 | 11:00 |
-| T5 | 13:00 |
-| T6 | 14:00 |
-| T7 | 15:00 |
-| T8 | 16:00 |
+|------|------|
+| T1 | 08:00 - 08:30 |
+| T2 | 08:30 - 09:00 |
+| T3 | 09:00 - 09:30 |
+| T4 | 09:30 - 10:00 |
+| T5 | 10:00 - 10:30 |
+| T6 | 10:30 - 11:00 |
+| T7 | 11:00 - 11:30 |
+| T8 | 11:30 - 12:00 |
+| T9 | 12:00 - 12:30 |
+| T10 | 12:30 - 13:00 |
+| T11 | 13:00 - 13:30 |
+| T12 | 13:30 - 14:00 |
+| T13 | 14:00 - 14:30 |
+| T14 | 14:30 - 15:00 |
+| T15 | 15:00 - 15:30 |
+| T16 | 15:30 - 16:00 |
 
 ---
 
-# 9. Technology Stack
+## 9. Technology Stack
 
-## Frontend
+### Frontend
 
 - React
-- Redux
-- TailwindCSS
+- Redux Toolkit
+- React Router
+- SASS / SCSS
+
+Styling convention:
+
+- Ưu tiên semantic class names
+- Tên class phải thể hiện đúng ý nghĩa UI hoặc block/component
+- Tránh utility-heavy naming trong target architecture
 
 Redux structure
 
-```
-
+```text
 store
 ├── authSlice
 ├── doctorSlice
 ├── bookingSlice
 ├── scheduleSlice
-
 ```
 
----
+### Backend
 
-## Backend
-
-- PHP Laravel
+- PHP 8.2+
+- Laravel 12
 - REST API
 - Service Layer
-- Transaction handling
+- Database transaction handling
+- Laravel Sanctum
 
----
-
-## Database
+### Database
 
 - MySQL
 - XAMPP
 
-Main tables
+---
 
-```
+## 10. Main Tables
 
+```text
 users
 allcodes
-clinics
-specialties
+clinic
+specialty
 doctor_infor
-doctor_markdowns
-schedules
-bookings
-histories
-ai_requests
-
+doctor_clinic_specialty
+schedule
+booking
+history
+markdown
 ```
 
 ---
 
-# 10. Database Schema
+## 11. Database Schema Notes
 
-## users
+### users
 
 Core identity table
 
-```
-
+```text
 id
+name
 email
-password_hash
-role_key
-position_key
-gender_key
-first_name
-last_name
-phone
-avatar_url
+password
+roleId
+positionId
+gender
+phoneNumber
+image
+isActive
 created_at
 updated_at
-
 ```
 
----
+### clinic
 
-## clinics
-
-```
-
+```text
 id
 name
 address
-image_url
 description
+image
 created_at
 updated_at
-
 ```
 
----
+### specialty
 
-## specialties
-
-```
-
+```text
 id
 name
 description
-image_url
+image
 created_at
 updated_at
-
 ```
 
-Example specialties
-
-- Cardiology
-- Dermatology
-- Neurology
-
----
-
-## doctor_infor
+### doctor_infor
 
 Thông tin chi tiết bác sĩ
 
-```
-
-doctor_id
-clinic_id
-specialty_id
-price_key
-payment_key
-province_key
-address_clinic
-name_clinic
+```text
+id
+doctorId
+priceId
+provinceId
+paymentId
+addressClinic
+nameClinic
 note
-count
 created_at
 updated_at
-
 ```
 
-MVP rule
+### doctor_clinic_specialty
 
+```text
+id
+doctorId
+clinicId
+specialtyId
+created_at
+updated_at
 ```
 
+MVP rule:
+
+```text
 1 doctor → 1 clinic
 1 doctor → 1 specialty
-
 ```
 
----
+### markdown
 
-## doctor_markdowns
-
-```
-
-doctor_id
+```text
+id
+doctorId
+specialtyId
+clinicId
 description
-content_markdown
-content_html
+contentMarkdown
+contentHTML
 created_at
 updated_at
-
 ```
 
----
+### schedule
 
-## schedules
+Slot availability theo ngày
 
-Slot lịch khám
-
-```
-
+```text
 id
-doctor_id
+doctorId
 date
-time_key
-max_number
-current_number
+timeType
+currentNumber
+isActive
 created_at
 updated_at
-
 ```
 
-Constraint
+Constraint:
 
+```text
+UNIQUE (doctorId, date, timeType)
 ```
 
-UNIQUE (doctor_id, date, time_key)
+Meaning:
 
-```
+- `isActive = true` và `currentNumber = 0` → slot mở và còn trống
+- `isActive = false` → slot đã bị doctor disable
+- `currentNumber = 1` → slot đã có bệnh nhân đặt
 
----
+### booking
 
-## bookings
-
-```
-
+```text
 id
-patient_id
-doctor_id
+statusId
+doctorId
+patientId
 date
-time_key
-status_key
-cancel_reason
-cancelled_by_role_key
-cancelled_at
+timeType
 created_at
 updated_at
-
 ```
 
-Indexes
+Indexes / constraints:
 
+```text
+(doctorId, date, timeType)
+(patientId, date)
+UNIQUE (patientId, doctorId, date, timeType)
 ```
 
-(doctor_id, date, time_key)
-(patient_id, date)
-
-```
-
----
-
-## histories
+### history
 
 Lưu kết quả khám bệnh
 
-```
-
+```text
 id
-booking_id
-patient_id
-doctor_id
+bookingId
+patientId
+doctorId
 description
-files_json
+files
 created_at
 updated_at
-
 ```
 
----
-
-## allcodes
+### allcodes
 
 Dynamic dictionary table
 
-```
-
+```text
 id
 type
 key
-value
-meta_json
-is_active
-sort_order
+valueEn
 created_at
 updated_at
-
 ```
 
-Types
+Types:
 
-```
-
+```text
 ROLE
 STATUS
 TIME
@@ -445,153 +427,141 @@ GENDER
 PRICE
 PAYMENT
 PROVINCE
-
-````
+```
 
 ---
 
-# 11. Prevent Overbooking
+## 12. Prevent Overbooking
 
-Booking phải chạy trong **database transaction**
+Rule:
 
-Logic
+```text
+Không cho 2 người đặt cùng một doctor slot trong cùng ngày.
+```
 
-```sql
-UPDATE schedules
-SET current_number = current_number + 1
-WHERE doctor_id = ?
+Implementation strategy:
+
+1. Lock row `schedule` theo `(doctorId, date, timeType)`
+2. Kiểm tra `isActive`
+3. Kiểm tra `currentNumber`
+4. Nếu `currentNumber = 0` thì set thành `1`
+5. Tạo booking
+
+Pseudo flow:
+
+```text
+IF schedule.isActive = false
+  -> reject
+
+IF schedule.currentNumber >= 1
+  -> reject
+
+UPDATE schedule
+SET currentNumber = 1
+WHERE doctorId = ?
 AND date = ?
-AND time_key = ?
-AND current_number < max_number
-````
+AND timeType = ?
 
-Nếu
-
-```
-affectedRows = 1
+INSERT booking
 ```
 
-→ Insert booking
+Nếu booking bị hủy:
 
-Nếu
-
+```text
+schedule.currentNumber = 0
 ```
-affectedRows = 0
-```
-
-→ Slot full
 
 ---
 
-# 12. API Design
+## 13. API Design
 
-## Auth
+### Auth
 
-```
+```text
 POST /api/auth/register
 POST /api/auth/login
 POST /api/auth/logout
 GET /api/auth/me
 ```
 
----
+### Public Catalog
 
-## Master Data
+```text
+GET /api/clinics
+GET /api/clinics/{id}
 
-```
+GET /api/specialties
+GET /api/specialties/{id}
+
+GET /api/doctors
+GET /api/doctors/{id}
+GET /api/doctors/{id}/availability
+
 GET /api/allcodes?type=TIME
 GET /api/allcodes?type=PRICE
 GET /api/allcodes?type=PAYMENT
 GET /api/allcodes?type=PROVINCE
 ```
 
----
+Compatibility routes also exist under:
 
-## Clinics
-
-```
-GET /api/clinics
-GET /api/clinics/{id}
+```text
+/api/v1/*
 ```
 
----
+### Booking (Patient)
 
-## Specialties
-
-```
-GET /api/specialties
-GET /api/specialties/{id}
-```
-
----
-
-## Doctors
-
-```
-GET /api/doctors
-GET /api/doctors/{id}
-GET /api/doctors/{id}/availability
-```
-
-Filters
-
-```
-specialtyId
-clinicId
-search
-page
-```
-
----
-
-## Booking (Patient)
-
-```
+```text
 POST /api/bookings
+
 GET /api/patient/bookings
 GET /api/patient/bookings/{id}
+POST /api/patient/bookings
 POST /api/patient/bookings/{id}/cancel
 ```
 
----
+### Doctor Availability
 
-## Doctor Schedule
-
-```
-POST /api/doctor/schedules
+```text
 GET /api/doctor/schedules
-DELETE /api/doctor/schedules/{id}
+POST /api/doctor/schedules
 ```
 
----
+Payload concept:
 
-## Doctor Bookings
-
+```json
+{
+  "date": "2026-03-16",
+  "disabledTimeTypes": ["T4", "T5", "T6"]
+}
 ```
+
+### Doctor Bookings
+
+```text
 GET /api/doctor/bookings
+POST /api/doctor/bookings/{id}/confirm
 POST /api/doctor/bookings/{id}/cancel
-POST /api/doctor/bookings/{id}/mark-done
+POST /api/doctor/bookings/{id}/send-prescription
 POST /api/doctor/bookings/{id}/mark-no-show
 ```
 
----
+### History
 
-## History
-
-```
+```text
 POST /api/histories
 GET /api/histories/{bookingId}
 ```
 
----
+### Admin APIs
 
-## Admin APIs
-
-```
+```text
+GET /api/admin/doctors
 POST /api/admin/doctors
 PATCH /api/admin/doctors/{id}
 
 GET /api/admin/users
+GET /api/admin/bookings
 
 POST /api/admin/clinics
 PATCH /api/admin/clinics/{id}
@@ -607,80 +577,53 @@ PATCH /api/admin/allcodes/{id}
 
 ---
 
-# 13. UI Pages
+## 14. UI Pages
 
-## Patient
+### Patient
 
-* Home
-* Specialty List
-* Doctor List
-* Doctor Detail
-* Booking Page
-* My Appointments
+- Home
+- Specialty List
+- Doctor List
+- Doctor Detail
+- Booking Page
+- My Appointments
 
----
+### Doctor
 
-## Doctor
+- Doctor Dashboard
+- Daily Availability Management
+- Appointment List
 
-* Doctor Dashboard
-* Create Schedule
-* Appointment List
+### Admin
 
----
-
-## Admin
-
-* Admin Dashboard
-* Doctor Management
-* Clinic Management
-* Specialty Management
-* Booking Management
+- Admin Dashboard
+- Doctor Management
+- Clinic Management
+- Specialty Management
+- Booking Management
 
 ---
 
-# 14. AI Feature (Planned)
+## 15. Future Improvements
 
-## Symptom Checker
-
-User nhập triệu chứng
-
-```
-"I have chest pain"
-```
-
-AI gợi ý
-
-```
-Specialty: Cardiology
-Urgency: Medium
-Advice: Please see a doctor soon
-```
-
-Sau đó redirect tới danh sách bác sĩ phù hợp.
+- Online payment
+- SMS/email reminder
+- Video consultation
+- AI medical assistant
 
 ---
 
-# 15. Future Improvements
+## 16. Payment Strategy
 
-* Online payment
-* SMS/email reminder
-* Video consultation
-* Multi-clinic doctors
-* AI medical assistant
+MVP:
 
----
-
-# 16. Payment Strategy
-
-MVP
-
-```
+```text
 Pay at clinic
 ```
 
-Future integration
+Future integration:
 
-```
+```text
 Stripe
 Apple Pay
 Bank transfer
@@ -688,29 +631,36 @@ Bank transfer
 
 ---
 
-# 17. Engineering Notes
+## 17. Engineering Notes
 
-Timezone
+### Timezone
 
-```
+```text
 Europe/London
 ```
 
-Phải xử lý
+Phải xử lý đúng:
 
-* DST
-* Booking window
-* Cancellation rule
+- DST
+- Booking window
+- Doctor cancellation rule
 
-Data constraints
+### Schedule Constraints
 
+```text
+UNIQUE (doctorId, date, timeType)
 ```
-UNIQUE (doctor_id, date, time_key)
-```
 
-Prevent duplicate booking
+### Prevent Duplicate Booking
 
-```
+```text
 patientId + doctorId + date + timeType
 ```
 
+### Capacity Model
+
+```text
+1 day = 16 slots
+1 slot = 1 patient
+1 doctor/day = tối đa 16 bệnh nhân
+```

@@ -8,9 +8,9 @@ class TimeHelper
 {
     private const TIMEZONE = 'Europe/London';
     private const SLOT_START_HOUR = 8;
-    private const SLOT_END_HOUR = 17;
+    private const SLOT_END_HOUR = 16;
     private const SLOT_INTERVAL_MINUTES = 30;
-    private const BOOKING_WINDOW_DAYS_AHEAD = 2;
+    private const BOOKING_WINDOW_DAYS_AHEAD = 30;
 
     private static ?array $slotHoursCache = null;
 
@@ -75,6 +75,17 @@ class TimeHelper
         }
 
         return $records;
+    }
+
+    public static function timeLabelFor(string $timeType): string
+    {
+        foreach (self::timeSlotAllcodeRecords() as $record) {
+            if (($record['key'] ?? null) === $timeType) {
+                return $record['valueEn'] ?? $timeType;
+            }
+        }
+
+        return $timeType;
     }
 
     public static function bookingWindowStart(): Carbon

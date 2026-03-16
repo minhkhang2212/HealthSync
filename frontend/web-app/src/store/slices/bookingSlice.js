@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/apiClient';
+import { extractApiErrorMessage } from '../../utils/apiErrors';
 
 // Async Thunks
 export const fetchBookings = createAsyncThunk(
@@ -9,7 +10,7 @@ export const fetchBookings = createAsyncThunk(
             const response = await apiClient.get('/patient/bookings');
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to fetch bookings.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to fetch bookings.'));
         }
     }
 );
@@ -21,11 +22,7 @@ export const createBooking = createAsyncThunk(
             const response = await apiClient.post('/patient/bookings', bookingData);
             return response.data;
         } catch (error) {
-            const errors = error.response?.data?.errors;
-            const message = errors
-                ? Object.values(errors).flat().join(' ')
-                : error.response?.data?.message || 'Failed to create booking.';
-            return rejectWithValue(message);
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to create booking.'));
         }
     }
 );
@@ -37,7 +34,7 @@ export const cancelBooking = createAsyncThunk(
             const response = await apiClient.post(`/patient/bookings/${id}/cancel`);
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to cancel booking.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to cancel booking.'));
         }
     }
 );
@@ -66,6 +63,7 @@ const bookingSlice = createSlice({
             })
             .addCase(fetchBookings.fulfilled, (state, action) => {
                 state.loading = false;
+                state.error = null;
                 state.bookings = action.payload;
             })
             .addCase(fetchBookings.rejected, (state, action) => {
@@ -75,7 +73,11 @@ const bookingSlice = createSlice({
 
         // Create
         builder
+            .addCase(createBooking.pending, (state) => {
+                state.error = null;
+            })
             .addCase(createBooking.fulfilled, (state, action) => {
+                state.error = null;
                 state.bookings.push(action.payload);
             })
             .addCase(createBooking.rejected, (state, action) => {
@@ -84,7 +86,11 @@ const bookingSlice = createSlice({
 
         // Cancel
         builder
+            .addCase(cancelBooking.pending, (state) => {
+                state.error = null;
+            })
             .addCase(cancelBooking.fulfilled, (state, action) => {
+                state.error = null;
                 if (action.payload?.id) {
                     const index = state.bookings.findIndex((b) => b.id === action.payload.id);
                     if (index !== -1) state.bookings[index] = action.payload;

@@ -9,7 +9,8 @@ class BookingDTO
         public int $doctorId,
         public string $date,
         public string $timeType,
-        public string $statusId
+        public string $statusId,
+        public string $patientContactEmail
     ) {}
 
     public static function fromRequest(array $data): self
@@ -19,7 +20,8 @@ class BookingDTO
             $data['doctorId'],
             $data['date'],
             $data['timeType'],
-            $data['statusId'] ?? 'S1' // Default status 'S1' = new booking
+            $data['statusId'] ?? 'S1', // Default status 'S1' = new booking
+            $data['patientContactEmail']
         );
     }
 
@@ -31,6 +33,7 @@ class BookingDTO
             'date' => $this->date,
             'timeType' => $this->timeType,
             'statusId' => $this->statusId,
+            'patientContactEmail' => $this->patientContactEmail,
         ];
     }
 }

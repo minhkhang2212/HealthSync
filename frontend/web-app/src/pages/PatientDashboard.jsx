@@ -18,11 +18,13 @@ import 'swiper/css/navigation';
 const DEFAULT_STATUS_LABELS = { S1: 'New', S2: 'Cancelled', S3: 'Done', S4: 'No-show' };
 
 const STATUS_BADGE_CLASSES = {
-    S1: 'bg-blue-50 text-blue-700 border-blue-200',
+    S1: 'bg-slate-50 text-slate-700 border-slate-200',
     S2: 'bg-red-50 text-red-700 border-red-200',
     S3: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     S4: 'bg-amber-50 text-amber-700 border-amber-200',
 };
+
+const CONFIRMED_BADGE_CLASS = 'bg-blue-50 text-blue-700 border-blue-200';
 
 const normalizeId = (value) => (value == null ? '' : String(value));
 
@@ -37,6 +39,41 @@ const formatBookingDate = (date) => {
     return Number.isNaN(parsed.getTime())
         ? date
         : parsed.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const getBookingStatusMeta = (booking, statusLabels) => {
+    if (booking.statusId === 'S2') {
+        return {
+            label: statusLabels.S2 || 'Cancelled',
+            className: STATUS_BADGE_CLASSES.S2,
+        };
+    }
+
+    if (booking.statusId === 'S3') {
+        return {
+            label: statusLabels.S3 || 'Done',
+            className: STATUS_BADGE_CLASSES.S3,
+        };
+    }
+
+    if (booking.statusId === 'S4') {
+        return {
+            label: statusLabels.S4 || 'No-show',
+            className: STATUS_BADGE_CLASSES.S4,
+        };
+    }
+
+    if (booking.confirmedAt) {
+        return {
+            label: 'Confirmed',
+            className: CONFIRMED_BADGE_CLASS,
+        };
+    }
+
+    return {
+        label: statusLabels.S1 || 'New',
+        className: STATUS_BADGE_CLASSES.S1,
+    };
 };
 
 const SPECIALTY_VISUALS = [
@@ -906,8 +943,8 @@ const PatientDashboard = () => {
                             <div className="space-y-3">
                                 {sortedBookings.map((booking) => {
                                     const doctor = doctorById.get(normalizeId(booking.doctorId));
-                                    const statusText = statusLabels[booking.statusId] || booking.statusId;
-                                    const statusClass = STATUS_BADGE_CLASSES[booking.statusId] || 'bg-slate-50 text-slate-700 border-slate-200';
+                                    const status = getBookingStatusMeta(booking, statusLabels);
+                                    const canCancel = booking.statusId === 'S1' && !booking.confirmedAt;
                                     return (
                                         <article key={booking.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                             <div className="flex items-center justify-between gap-2">
@@ -915,11 +952,17 @@ const PatientDashboard = () => {
                                                     <p className="font-black">Booking #{booking.id}</p>
                                                     <p className="text-sm text-slate-500">{doctor?.name || `Doctor #${booking.doctorId}`}</p>
                                                 </div>
-                                                <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${statusClass}`}>{statusText}</span>
+                                                <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
                                             </div>
                                             <p className="mt-2 text-sm text-slate-600">Date: {formatBookingDate(booking.date)}</p>
                                             <p className="text-sm text-slate-600">Time: {timeLabels[booking.timeType] || booking.timeType}</p>
-                                            {booking.statusId === 'S1' && (
+                                            <p className="text-sm text-slate-600">Contact email: {booking.patientContactEmail || user?.email || 'Not provided'}</p>
+                                            {booking.confirmedAt && booking.statusId === 'S1' && (
+                                                <p className="mt-3 text-sm font-medium text-blue-700">
+                                                    Your doctor has confirmed this appointment.
+                                                </p>
+                                            )}
+                                            {canCancel && (
                                                 <button
                                                     onClick={() => handleCancelBooking(booking.id)}
                                                     disabled={actionLoadingId === booking.id}

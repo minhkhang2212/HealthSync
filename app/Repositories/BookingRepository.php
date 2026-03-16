@@ -7,14 +7,22 @@ use Illuminate\Database\Eloquent\Collection;
 
 class BookingRepository
 {
+    private function baseQuery()
+    {
+        return Booking::query()->with([
+            'patient:id,name,email',
+            'doctor:id,name,email',
+        ]);
+    }
+
     public function getAll(): Collection
     {
-        return Booking::all();
+        return $this->baseQuery()->get();
     }
 
     public function findById(int $id): ?Booking
     {
-        return Booking::find($id);
+        return $this->baseQuery()->find($id);
     }
 
     public function create(array $data): Booking
@@ -42,11 +50,25 @@ class BookingRepository
 
     public function getByPatientId(int $patientId): Collection
     {
-        return Booking::where('patientId', $patientId)->get();
+        return $this->baseQuery()
+            ->where('patientId', $patientId)
+            ->orderByDesc('date')
+            ->orderByDesc('timeType')
+            ->get();
     }
 
-    public function getByDoctorId(int $doctorId): Collection
+    public function getByDoctorId(int $doctorId, ?string $date = null): Collection
     {
-        return Booking::where('doctorId', $doctorId)->get();
+        $query = $this->baseQuery()
+            ->where('doctorId', $doctorId);
+
+        if ($date) {
+            $query->whereDate('date', $date);
+        }
+
+        return $query
+            ->orderBy('date')
+            ->orderBy('timeType')
+            ->get();
     }
 }

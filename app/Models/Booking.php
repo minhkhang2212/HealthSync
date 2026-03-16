@@ -15,9 +15,19 @@ class Booking extends Model
     protected $fillable = [
         'patientId',
         'doctorId',
+        'patientContactEmail',
         'date',
         'timeType',
         'statusId',
+        'confirmedAt',
+        'confirmationAttachment',
+        'prescriptionSentAt',
+        'prescriptionAttachment',
+    ];
+
+    protected $casts = [
+        'confirmedAt' => 'datetime',
+        'prescriptionSentAt' => 'datetime',
     ];
 
     public function patient(): BelongsTo

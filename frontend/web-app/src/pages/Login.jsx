@@ -22,7 +22,7 @@ const Login = () => {
         if (loginUser.fulfilled.match(result)) {
             const role = result.payload.user?.roleId;
             if (role === 'R1') navigate('/admin/dashboard');
-            else if (role === 'R2') navigate('/doctor');
+            else if (role === 'R2') navigate('/doctor/dashboard');
             else navigate('/patient');
         }
     };

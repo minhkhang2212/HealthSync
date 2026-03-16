@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('doctorId')->constrained('users')->cascadeOnDelete();
             $table->date('date');
             $table->string('timeType', 20);
-            $table->unsignedInteger('maxNumber');
             $table->unsignedInteger('currentNumber')->default(0);
             $table->timestamps();
 

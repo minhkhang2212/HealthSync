@@ -69,5 +69,10 @@ class AllcodeSeeder extends Seeder
                 $code
             );
         }
+
+        DB::table('allcodes')
+            ->where('type', 'TIME')
+            ->whereNotIn('key', TimeHelper::timeTypeKeys())
+            ->delete();
     }
 }

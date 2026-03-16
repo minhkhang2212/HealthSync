@@ -6,6 +6,7 @@ use App\DTO\BookingDTO;
 use App\Helpers\TimeHelper;
 use App\Http\Controllers\Controller;
 use App\Services\BookingService;
+use App\Support\BookingErrorMessage;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class BookingController extends Controller
             'doctorId' => 'required|integer|exists:users,id',
             'date' => 'required|date',
             'timeType' => ['required', 'string', Rule::in(TimeHelper::timeTypeKeys())],
+            'patientContactEmail' => 'required|string|email|max:255',
         ]);
 
         $dto = new BookingDTO(
@@ -30,14 +32,22 @@ class BookingController extends Controller
             $validated['doctorId'],
             $validated['date'],
             $validated['timeType'],
-            'S1'
+            'S1',
+            $validated['patientContactEmail']
         );
 
         try {
             $booking = $this->bookingService->createBooking($dto);
             return response()->json($booking, 201);
         } catch (Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            report($e);
+
+            return response()->json([
+                'message' => BookingErrorMessage::resolve(
+                    $e,
+                    'Unable to create booking right now. Please try again.'
+                ),
+            ], 422);
         }
     }
 }

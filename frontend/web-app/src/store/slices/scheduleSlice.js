@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/apiClient';
 import { TIME_CODES } from '../../utils/timeSlots';
+import { extractApiErrorMessage } from '../../utils/apiErrors';
 
 export const fetchDoctorSchedules = createAsyncThunk(
     'schedule/fetchDoctorSchedules',
@@ -11,7 +12,7 @@ export const fetchDoctorSchedules = createAsyncThunk(
             });
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to fetch schedules.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to fetch schedules.'));
         }
     }
 );
@@ -26,23 +27,21 @@ export const saveDoctorSchedules = createAsyncThunk(
             const response = await apiClient.post('/doctor/schedules', { date, disabledTimeTypes });
             return response.data?.data ?? [];
         } catch (error) {
-            const errors = error.response?.data?.errors;
-            const message = errors
-                ? Object.values(errors).flat().join(' ')
-                : error.response?.data?.message || 'Failed to save schedules.';
-            return rejectWithValue(message);
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to save schedules.'));
         }
     }
 );
 
 export const fetchDoctorBookings = createAsyncThunk(
     'schedule/fetchDoctorBookings',
-    async (_, { rejectWithValue }) => {
+    async ({ date } = {}, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get('/doctor/bookings');
+            const response = await apiClient.get('/doctor/bookings', {
+                params: date ? { date } : {},
+            });
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to fetch bookings.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to fetch bookings.'));
         }
     }
 );
@@ -54,19 +53,49 @@ export const cancelDoctorBooking = createAsyncThunk(
             const response = await apiClient.post(`/doctor/bookings/${id}/cancel`);
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to cancel booking.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to cancel booking.'));
         }
     }
 );
 
-export const markDoctorBookingDone = createAsyncThunk(
-    'schedule/markDoctorBookingDone',
-    async (id, { rejectWithValue }) => {
+export const confirmDoctorBooking = createAsyncThunk(
+    'schedule/confirmDoctorBooking',
+    async ({ id, attachmentFile }, { rejectWithValue }) => {
         try {
-            const response = await apiClient.post(`/doctor/bookings/${id}/mark-done`);
+            const payload = new FormData();
+            if (attachmentFile instanceof File) {
+                payload.append('confirmationFile', attachmentFile);
+            }
+
+            const response = await apiClient.post(`/doctor/bookings/${id}/confirm`, payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to mark booking as done.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to confirm booking.'));
+        }
+    }
+);
+
+export const sendDoctorPrescription = createAsyncThunk(
+    'schedule/sendDoctorPrescription',
+    async ({ id, attachmentFile }, { rejectWithValue }) => {
+        try {
+            const payload = new FormData();
+            if (attachmentFile instanceof File) {
+                payload.append('prescriptionFile', attachmentFile);
+            }
+
+            const response = await apiClient.post(`/doctor/bookings/${id}/send-prescription`, payload, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to send prescription.'));
         }
     }
 );
@@ -78,7 +107,7 @@ export const markDoctorBookingNoShow = createAsyncThunk(
             const response = await apiClient.post(`/doctor/bookings/${id}/mark-no-show`);
             return response.data;
         } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to mark booking as no-show.');
+            return rejectWithValue(extractApiErrorMessage(error, 'Failed to mark booking as no-show.'));
         }
     }
 );
@@ -123,6 +152,7 @@ const scheduleSlice = createSlice({
             })
             .addCase(fetchDoctorSchedules.fulfilled, (state, action) => {
                 state.loadingSchedules = false;
+                state.error = null;
                 state.schedules = action.payload;
             })
             .addCase(fetchDoctorSchedules.rejected, (state, action) => {
@@ -137,6 +167,7 @@ const scheduleSlice = createSlice({
             })
             .addCase(saveDoctorSchedules.fulfilled, (state, action) => {
                 state.submitting = false;
+                state.error = null;
                 state.schedules = action.payload;
             })
             .addCase(saveDoctorSchedules.rejected, (state, action) => {
@@ -151,6 +182,7 @@ const scheduleSlice = createSlice({
             })
             .addCase(fetchDoctorBookings.fulfilled, (state, action) => {
                 state.loadingBookings = false;
+                state.error = null;
                 state.bookings = action.payload;
             })
             .addCase(fetchDoctorBookings.rejected, (state, action) => {
@@ -159,7 +191,11 @@ const scheduleSlice = createSlice({
             });
 
         builder
+            .addCase(cancelDoctorBooking.pending, (state) => {
+                state.error = null;
+            })
             .addCase(cancelDoctorBooking.fulfilled, (state, action) => {
+                state.error = null;
                 state.bookings = upsertBooking(state.bookings, action.payload);
             })
             .addCase(cancelDoctorBooking.rejected, (state, action) => {
@@ -167,15 +203,35 @@ const scheduleSlice = createSlice({
             });
 
         builder
-            .addCase(markDoctorBookingDone.fulfilled, (state, action) => {
+            .addCase(confirmDoctorBooking.pending, (state) => {
+                state.error = null;
+            })
+            .addCase(confirmDoctorBooking.fulfilled, (state, action) => {
+                state.error = null;
                 state.bookings = upsertBooking(state.bookings, action.payload);
             })
-            .addCase(markDoctorBookingDone.rejected, (state, action) => {
+            .addCase(confirmDoctorBooking.rejected, (state, action) => {
                 state.error = action.payload;
             });
 
         builder
+            .addCase(sendDoctorPrescription.pending, (state) => {
+                state.error = null;
+            })
+            .addCase(sendDoctorPrescription.fulfilled, (state, action) => {
+                state.error = null;
+                state.bookings = upsertBooking(state.bookings, action.payload);
+            })
+            .addCase(sendDoctorPrescription.rejected, (state, action) => {
+                state.error = action.payload;
+            });
+
+        builder
+            .addCase(markDoctorBookingNoShow.pending, (state) => {
+                state.error = null;
+            })
             .addCase(markDoctorBookingNoShow.fulfilled, (state, action) => {
+                state.error = null;
                 state.bookings = upsertBooking(state.bookings, action.payload);
             })
             .addCase(markDoctorBookingNoShow.rejected, (state, action) => {

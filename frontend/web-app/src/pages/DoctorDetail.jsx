@@ -11,11 +11,13 @@ const DoctorDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const { user } = useSelector((state) => state.auth);
     const { selectedDoctor, availability, loading, error } = useSelector((state) => state.doctor);
     const { loading: bookingLoading, error: bookingError } = useSelector((state) => state.booking);
 
     const [selectedDate, setSelectedDate] = React.useState('');
     const [selectedTime, setSelectedTime] = React.useState('');
+    const [contactEmail, setContactEmail] = React.useState('');
     const [timeLabels, setTimeLabels] = React.useState(DEFAULT_TIME_LABELS);
     const [successMessage, setSuccessMessage] = React.useState('');
 
@@ -50,6 +52,12 @@ const DoctorDetail = () => {
     }, []);
 
     React.useEffect(() => {
+        if (!contactEmail && user?.email) {
+            setContactEmail(user.email);
+        }
+    }, [contactEmail, user?.email]);
+
+    React.useEffect(() => {
         if (availability.length === 0) {
             setSelectedDate('');
             setSelectedTime('');
@@ -80,6 +88,7 @@ const DoctorDetail = () => {
                 doctorId: Number(id),
                 date: selectedDate,
                 timeType: selectedTime,
+                patientContactEmail: contactEmail.trim(),
             })
         );
 
@@ -175,9 +184,21 @@ const DoctorDetail = () => {
                                 )}
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-bold mb-1">Contact Email For Booking</label>
+                                <input
+                                    type="email"
+                                    value={contactEmail}
+                                    onChange={(event) => setContactEmail(event.target.value)}
+                                    placeholder="patient@example.com"
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                />
+                                <p className="mt-2 text-xs text-slate-500">Confirmation and prescription emails will be sent to this address.</p>
+                            </div>
+
                             <button
                                 onClick={handleCreateBooking}
-                                disabled={!selectedDate || !selectedTime || bookingLoading}
+                                disabled={!selectedDate || !selectedTime || !contactEmail.trim() || bookingLoading}
                                 className="w-full rounded-lg bg-primary text-white font-black py-3 disabled:opacity-60"
                             >
                                 {bookingLoading ? 'Booking...' : 'Confirm Booking'}

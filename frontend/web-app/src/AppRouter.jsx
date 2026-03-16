@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import PatientDashboard from './pages/PatientDashboard';
 import DoctorDetail from './pages/DoctorDetail';
 import DoctorDashboard from './pages/DoctorDashboard';
+import DoctorAppointments from './pages/DoctorAppointments';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
@@ -33,7 +34,7 @@ const RootRedirect = () => {
 
     // Redirect based on role if already logged in
     if (user?.roleId === 'R1') return <Navigate to="/admin/dashboard" replace />;
-    if (user?.roleId === 'R2') return <Navigate to="/doctor" replace />;
+    if (user?.roleId === 'R2') return <Navigate to="/doctor/dashboard" replace />;
     return <Navigate to="/patient" replace />;
 };
 
@@ -54,7 +55,9 @@ const AppRouter = () => {
 
                 {/* Doctor Routes */}
                 <Route path="/doctor" element={<ProtectedRoute allowedRoles={['R2']} />}>
-                    <Route index element={<DoctorDashboard />} />
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<DoctorDashboard />} />
+                    <Route path="appointments" element={<DoctorAppointments />} />
                 </Route>
 
                 {/* Admin Routes */}

@@ -85,6 +85,9 @@ class DoctorProfileController extends Controller
 
         $timeTypes = TimeHelper::timeTypeKeys();
         if (!empty($validated['date'])) {
+            if (!TimeHelper::isDateWithinBookingWindow($validated['date'])) {
+                return response()->json([]);
+            }
             $dates = [$validated['date']];
         } else {
             $dates = TimeHelper::bookingDateStrings();

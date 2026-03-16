@@ -17,18 +17,51 @@ const navItems = [
 ];
 
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const bookingStatusMap = {
-    S1: { chipClass: 'text-blue-700 bg-blue-100', dateClass: 'bg-blue-100 text-primary' },
-    S2: { chipClass: 'text-red-700 bg-red-100', dateClass: 'bg-red-100 text-red-600' },
-    S3: { chipClass: 'text-emerald-700 bg-emerald-100', dateClass: 'bg-blue-100 text-primary' },
-    S4: { chipClass: 'text-amber-700 bg-amber-100', dateClass: 'bg-blue-100 text-primary' },
-};
-
 const DEFAULT_STATUS_LABELS = {
     S1: 'New',
     S2: 'Cancelled',
     S3: 'Done',
     S4: 'No-show',
+};
+
+const getBookingStatusMeta = (booking, statusLabels) => {
+    if (booking.statusId === 'S2') {
+        return {
+            label: statusLabels.S2 || 'Cancelled',
+            chipClass: 'text-red-700 bg-red-100',
+            dateClass: 'bg-red-100 text-red-600',
+        };
+    }
+
+    if (booking.statusId === 'S3') {
+        return {
+            label: statusLabels.S3 || 'Done',
+            chipClass: 'text-emerald-700 bg-emerald-100',
+            dateClass: 'bg-emerald-100 text-emerald-700',
+        };
+    }
+
+    if (booking.statusId === 'S4') {
+        return {
+            label: statusLabels.S4 || 'No-show',
+            chipClass: 'text-amber-700 bg-amber-100',
+            dateClass: 'bg-amber-100 text-amber-700',
+        };
+    }
+
+    if (booking.confirmedAt) {
+        return {
+            label: 'Confirmed',
+            chipClass: 'text-blue-700 bg-blue-100',
+            dateClass: 'bg-blue-100 text-primary',
+        };
+    }
+
+    return {
+        label: statusLabels.S1 || 'New',
+        chipClass: 'text-slate-700 bg-slate-100',
+        dateClass: 'bg-slate-200 text-slate-600',
+    };
 };
 
 const getBookingDateParts = (date) => {
@@ -354,13 +387,11 @@ const AdminDashboard = () => {
                                 <h2 className="text-lg font-black">Booking Management</h2>
                                 <div className="mt-3 space-y-2.5">
                                     {bookingState.loading ? <p className="text-sm text-slate-500">Loading bookings...</p> : bookingState.recent.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No booking feed yet. Add GET /api/admin/bookings to show records here.</p> : bookingState.recent.map((item) => {
-                                        const statusKey = item.statusId || item.status || 'S1';
-                                        const statusTheme = bookingStatusMap[statusKey] || { chipClass: 'text-slate-700 bg-slate-100', dateClass: 'bg-slate-200 text-slate-600' };
+                                        const statusTheme = getBookingStatusMeta(item, statusLabels);
                                         const patientName = item.patient?.name || `Patient #${item.patientId || '--'}`;
                                         const doctorName = item.doctor?.name || `Doctor #${item.doctorId || '--'}`;
                                         const specialtyName = doctorSpecialtyById[String(item.doctorId)] || 'General';
                                         const timeText = timeLabels[item.timeType] || item.timeType || '--';
-                                        const statusText = statusLabels[statusKey] || statusKey;
                                         const dateParts = getBookingDateParts(item.date);
                                         return (
                                             <div key={item.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2.5 sm:px-3">
@@ -377,7 +408,7 @@ const AdminDashboard = () => {
                                                 <div className="flex items-center gap-2">
                                                     <div className="text-right">
                                                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${statusTheme.chipClass}`}>
-                                                            {String(statusText).toUpperCase()}
+                                                            {String(statusTheme.label).toUpperCase()}
                                                         </span>
                                                         <p className="mt-1 text-[11px] font-bold text-slate-400">{timeText}</p>
                                                     </div>

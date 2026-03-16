@@ -12,29 +12,19 @@ const BookingManagement = () => {
         dispatch(fetchAdminBookings());
     }, [dispatch]);
 
-    // Format utility
-    const getStatusStyle = (statusId) => {
-        switch (statusId) {
-            case 'S1': // New
-                return 'bg-amber-100 text-amber-700';
-            case 'S2': // Confirmed
-                return 'bg-blue-100 text-blue-700';
-            case 'S3': // Done
-                return 'bg-emerald-100 text-emerald-700';
-            case 'S4': // Cancelled
-                return 'bg-red-100 text-red-700';
+    const getStatusMeta = (booking) => {
+        switch (booking.statusId) {
+            case 'S2':
+                return { label: 'Cancelled', className: 'bg-red-100 text-red-700' };
+            case 'S3':
+                return { label: 'Done', className: 'bg-emerald-100 text-emerald-700' };
+            case 'S4':
+                return { label: 'No-show', className: 'bg-amber-100 text-amber-700' };
             default:
-                return 'bg-slate-100 text-slate-700';
-        }
-    };
-
-    const getStatusLabel = (statusId) => {
-        switch (statusId) {
-            case 'S1': return 'New';
-            case 'S2': return 'Confirmed';
-            case 'S3': return 'Completed';
-            case 'S4': return 'Cancelled';
-            default: return statusId || 'Unknown';
+                if (booking.confirmedAt) {
+                    return { label: 'Confirmed', className: 'bg-blue-100 text-blue-700' };
+                }
+                return { label: 'New', className: 'bg-slate-100 text-slate-700' };
         }
     };
 
@@ -78,11 +68,14 @@ const BookingManagement = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
-                                {bookings.map((booking) => (
+                                {bookings.map((booking) => {
+                                    const status = getStatusMeta(booking);
+
+                                    return (
                                     <tr key={booking.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-4">
                                             <p className="text-sm font-bold">{booking.patient?.name || 'Unknown'}</p>
-                                            <p className="text-xs text-slate-500">{booking.patient?.email}</p>
+                                            <p className="text-xs text-slate-500">{booking.patientContactEmail || booking.patient?.email}</p>
                                         </td>
                                         <td className="px-6 py-4">
                                             <p className="text-sm font-bold text-slate-700">{booking.doctor?.name || 'Unknown'}</p>
@@ -97,12 +90,13 @@ const BookingManagement = () => {
                                             <p className="text-sm font-medium text-slate-600">{booking.timeType}</p>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${getStatusStyle(booking.statusId)}`}>
-                                                {getStatusLabel(booking.statusId)}
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${status.className}`}>
+                                                {status.label}
                                             </span>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

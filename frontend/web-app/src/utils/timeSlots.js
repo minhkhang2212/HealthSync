@@ -1,5 +1,5 @@
 const SLOT_START_HOUR = 8;
-const SLOT_END_HOUR = 17;
+const SLOT_END_HOUR = 16;
 const SLOT_INTERVAL_MINUTES = 30;
 
 const to12HourLabel = (hour, minute) => {
