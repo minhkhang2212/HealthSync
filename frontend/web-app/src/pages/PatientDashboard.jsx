@@ -8,6 +8,7 @@ import { fetchClinics } from '../store/slices/clinicSlice';
 import { cancelBooking, fetchBookings } from '../store/slices/bookingSlice';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
+import { DEFAULT_TIME_LABELS } from '../utils/timeSlots';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
 import { BsCheckCircleFill } from 'react-icons/bs';
@@ -15,16 +16,6 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 
 const DEFAULT_STATUS_LABELS = { S1: 'New', S2: 'Cancelled', S3: 'Done', S4: 'No-show' };
-const DEFAULT_TIME_LABELS = {
-    T1: '8:00 AM - 9:00 AM',
-    T2: '9:00 AM - 10:00 AM',
-    T3: '10:00 AM - 11:00 AM',
-    T4: '11:00 AM - 12:00 PM',
-    T5: '1:00 PM - 2:00 PM',
-    T6: '2:00 PM - 3:00 PM',
-    T7: '3:00 PM - 4:00 PM',
-    T8: '4:00 PM - 5:00 PM',
-};
 
 const STATUS_BADGE_CLASSES = {
     S1: 'bg-blue-50 text-blue-700 border-blue-200',

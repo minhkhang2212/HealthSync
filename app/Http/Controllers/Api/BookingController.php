@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\DTO\BookingDTO;
+use App\Helpers\TimeHelper;
 use App\Http\Controllers\Controller;
 use App\Services\BookingService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
 {
@@ -20,7 +22,7 @@ class BookingController extends Controller
         $validated = $request->validate([
             'doctorId' => 'required|integer|exists:users,id',
             'date' => 'required|date',
-            'timeType' => 'required|string|max:20',
+            'timeType' => ['required', 'string', Rule::in(TimeHelper::timeTypeKeys())],
         ]);
 
         $dto = new BookingDTO(

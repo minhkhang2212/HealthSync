@@ -5,17 +5,7 @@ import { createBooking } from '../store/slices/bookingSlice';
 import { fetchDoctorAvailability, fetchDoctorById } from '../store/slices/doctorSlice';
 import apiClient from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
-
-const DEFAULT_TIME_LABELS = {
-    T1: '08:00',
-    T2: '09:00',
-    T3: '10:00',
-    T4: '11:00',
-    T5: '13:00',
-    T6: '14:00',
-    T7: '15:00',
-    T8: '16:00',
-};
+import { compareTimeType, DEFAULT_TIME_LABELS } from '../utils/timeSlots';
 
 const DoctorDetail = () => {
     const { id } = useParams();
@@ -77,8 +67,8 @@ const DoctorDetail = () => {
 
     const selectedDateSlots = React.useMemo(
         () => availability
-            .filter((slot) => slot.date === selectedDate && slot.currentNumber < slot.maxNumber)
-            .sort((a, b) => a.timeType.localeCompare(b.timeType)),
+            .filter((slot) => slot.date === selectedDate && slot.currentNumber < 1 && slot.isActive !== false)
+            .sort((a, b) => compareTimeType(a.timeType, b.timeType)),
         [availability, selectedDate]
     );
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\TimeHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\User;
@@ -82,16 +83,53 @@ class DoctorProfileController extends Controller
             'date' => 'nullable|date',
         ]);
 
-        $query = Schedule::query()
-            ->where('doctorId', $doctor->id)
-            ->whereDate('date', '>=', now('Europe/London')->toDateString())
-            ->orderBy('date')
-            ->orderBy('timeType');
-
+        $timeTypes = TimeHelper::timeTypeKeys();
         if (!empty($validated['date'])) {
-            $query->whereDate('date', $validated['date']);
+            $dates = [$validated['date']];
+        } else {
+            $dates = TimeHelper::bookingDateStrings();
         }
 
-        return response()->json($query->get());
+        if ($dates === []) {
+            return response()->json([]);
+        }
+
+        $existing = Schedule::query()
+            ->where('doctorId', $doctor->id)
+            ->whereIn('date', $dates)
+            ->get()
+            ->keyBy(fn (Schedule $slot) => "{$slot->date}|{$slot->timeType}");
+
+        $rows = [];
+        foreach ($dates as $date) {
+            foreach ($timeTypes as $timeType) {
+                /** @var Schedule|null $stored */
+                $stored = $existing->get("{$date}|{$timeType}");
+                $slot = [
+                    'id' => $stored?->id,
+                    'doctorId' => $doctor->id,
+                    'date' => $date,
+                    'timeType' => $timeType,
+                    'currentNumber' => (int) ($stored?->currentNumber ?? 0),
+                    'isActive' => $stored ? (bool) $stored->isActive : true,
+                ];
+
+                if ($slot['isActive'] && $slot['currentNumber'] < 1) {
+                    $rows[] = $slot;
+                }
+            }
+        }
+
+        usort($rows, function (array $left, array $right): int {
+            if ($left['date'] !== $right['date']) {
+                return strcmp($left['date'], $right['date']);
+            }
+
+            $leftOrder = (int) preg_replace('/\D/', '', (string) $left['timeType']);
+            $rightOrder = (int) preg_replace('/\D/', '', (string) $right['timeType']);
+            return $leftOrder <=> $rightOrder;
+        });
+
+        return response()->json($rows);
     }
 }

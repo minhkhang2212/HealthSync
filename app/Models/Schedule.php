@@ -16,8 +16,12 @@ class Schedule extends Model
         'doctorId',
         'date',
         'timeType',
-        'maxNumber',
         'currentNumber',
+        'isActive',
+    ];
+
+    protected $casts = [
+        'isActive' => 'boolean',
     ];
 
     public function doctor(): BelongsTo

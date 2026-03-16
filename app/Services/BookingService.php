@@ -9,6 +9,7 @@ use App\Repositories\BookingRepository;
 use App\Repositories\ScheduleRepository;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -54,7 +55,31 @@ class BookingService
             );
 
             if (!$lockedSchedule) {
+                try {
+                    $this->scheduleRepository->create([
+                        'doctorId' => $dto->doctorId,
+                        'date' => $dto->date,
+                        'timeType' => $dto->timeType,
+                        'currentNumber' => 0,
+                        'isActive' => true,
+                    ]);
+                } catch (QueryException) {
+                    // Another request may have created this slot concurrently.
+                }
+
+                $lockedSchedule = $this->scheduleRepository->findByDoctorAndSlotForUpdate(
+                    $dto->doctorId,
+                    $dto->date,
+                    $dto->timeType
+                );
+            }
+
+            if (!$lockedSchedule) {
                 throw new Exception("No schedule found for the selected time.");
+            }
+
+            if ($lockedSchedule->isActive === false) {
+                throw new Exception("This time slot is unavailable.");
             }
 
             // 2. Check capacity
@@ -130,7 +155,7 @@ class BookingService
 
     private function preventOverbooking($schedule): void
     {
-        if ($schedule->currentNumber >= $schedule->maxNumber) {
+        if ($schedule->currentNumber >= 1) {
             throw new Exception("This time slot is fully booked.");
         }
     }

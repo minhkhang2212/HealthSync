@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Helpers\TimeHelper;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -18,16 +19,6 @@ class AllcodeSeeder extends Seeder
             ['type' => 'STATUS', 'key' => 'S2', 'valueEn' => 'Cancelled', 'valueVi' => 'Da huy'],
             ['type' => 'STATUS', 'key' => 'S3', 'valueEn' => 'Done', 'valueVi' => 'Da kham xong'],
             ['type' => 'STATUS', 'key' => 'S4', 'valueEn' => 'No-show', 'valueVi' => 'Vang mat'],
-
-            // TIME
-            ['type' => 'TIME', 'key' => 'T1', 'valueEn' => '8:00 AM - 9:00 AM', 'valueVi' => '8:00 - 9:00'],
-            ['type' => 'TIME', 'key' => 'T2', 'valueEn' => '9:00 AM - 10:00 AM', 'valueVi' => '9:00 - 10:00'],
-            ['type' => 'TIME', 'key' => 'T3', 'valueEn' => '10:00 AM - 11:00 AM', 'valueVi' => '10:00 - 11:00'],
-            ['type' => 'TIME', 'key' => 'T4', 'valueEn' => '11:00 AM - 12:00 PM', 'valueVi' => '11:00 - 12:00'],
-            ['type' => 'TIME', 'key' => 'T5', 'valueEn' => '1:00 PM - 2:00 PM', 'valueVi' => '13:00 - 14:00'],
-            ['type' => 'TIME', 'key' => 'T6', 'valueEn' => '2:00 PM - 3:00 PM', 'valueVi' => '14:00 - 15:00'],
-            ['type' => 'TIME', 'key' => 'T7', 'valueEn' => '3:00 PM - 4:00 PM', 'valueVi' => '15:00 - 16:00'],
-            ['type' => 'TIME', 'key' => 'T8', 'valueEn' => '4:00 PM - 5:00 PM', 'valueVi' => '16:00 - 17:00'],
 
             // POSITION
             ['type' => 'POSITION', 'key' => 'P0', 'valueEn' => 'Doctor', 'valueVi' => 'Bac si'],
@@ -66,6 +57,11 @@ class AllcodeSeeder extends Seeder
             ['type' => 'PROVINCE', 'key' => 'PRO5', 'valueEn' => 'Bristol', 'valueVi' => 'Bristol'],
             ['type' => 'PROVINCE', 'key' => 'PRO6', 'valueEn' => 'Liverpool', 'valueVi' => 'Liverpool'],
         ];
+
+        $allcodes = array_merge(
+            $allcodes,
+            TimeHelper::timeSlotAllcodeRecords()
+        );
 
         foreach ($allcodes as $code) {
             DB::table('allcodes')->updateOrInsert(

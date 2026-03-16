@@ -1,11 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../utils/apiClient';
+import { TIME_CODES } from '../../utils/timeSlots';
 
 export const fetchDoctorSchedules = createAsyncThunk(
     'schedule/fetchDoctorSchedules',
-    async (_, { rejectWithValue }) => {
+    async ({ date } = {}, { rejectWithValue }) => {
         try {
-            const response = await apiClient.get('/doctor/schedules');
+            const response = await apiClient.get('/doctor/schedules', {
+                params: date ? { date } : {},
+            });
             return response.data;
         } catch (error) {
             return rejectWithValue(error.response?.data?.message || 'Failed to fetch schedules.');
@@ -15,15 +18,12 @@ export const fetchDoctorSchedules = createAsyncThunk(
 
 export const saveDoctorSchedules = createAsyncThunk(
     'schedule/saveDoctorSchedules',
-    async ({ date, timeTypes, maxNumber }, { rejectWithValue }) => {
+    async ({ date, enabledTimeTypes }, { rejectWithValue }) => {
         try {
-            const schedules = timeTypes.map((timeType) => ({
-                date,
-                timeType,
-                maxNumber,
-            }));
+            const enabled = new Set(enabledTimeTypes || []);
+            const disabledTimeTypes = TIME_CODES.filter((timeType) => !enabled.has(timeType));
 
-            const response = await apiClient.post('/doctor/schedules', { schedules });
+            const response = await apiClient.post('/doctor/schedules', { date, disabledTimeTypes });
             return response.data?.data ?? [];
         } catch (error) {
             const errors = error.response?.data?.errors;
@@ -31,18 +31,6 @@ export const saveDoctorSchedules = createAsyncThunk(
                 ? Object.values(errors).flat().join(' ')
                 : error.response?.data?.message || 'Failed to save schedules.';
             return rejectWithValue(message);
-        }
-    }
-);
-
-export const deleteDoctorSchedule = createAsyncThunk(
-    'schedule/deleteDoctorSchedule',
-    async (id, { rejectWithValue }) => {
-        try {
-            await apiClient.delete(`/doctor/schedules/${id}`);
-            return id;
-        } catch (error) {
-            return rejectWithValue(error.response?.data?.message || 'Failed to delete schedule.');
         }
     }
 );
@@ -149,25 +137,10 @@ const scheduleSlice = createSlice({
             })
             .addCase(saveDoctorSchedules.fulfilled, (state, action) => {
                 state.submitting = false;
-                for (const created of action.payload) {
-                    const idx = state.schedules.findIndex((item) => item.id === created.id);
-                    if (idx === -1) {
-                        state.schedules.push(created);
-                    } else {
-                        state.schedules[idx] = created;
-                    }
-                }
+                state.schedules = action.payload;
             })
             .addCase(saveDoctorSchedules.rejected, (state, action) => {
                 state.submitting = false;
-                state.error = action.payload;
-            });
-
-        builder
-            .addCase(deleteDoctorSchedule.fulfilled, (state, action) => {
-                state.schedules = state.schedules.filter((item) => item.id !== action.payload);
-            })
-            .addCase(deleteDoctorSchedule.rejected, (state, action) => {
                 state.error = action.payload;
             });
 

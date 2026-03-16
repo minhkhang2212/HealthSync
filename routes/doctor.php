@@ -8,7 +8,6 @@ Route::middleware(['auth:sanctum', 'role:R2'])->group(function () {
     // Schedules
     Route::get('/schedules', [ScheduleController::class, 'index']);
     Route::post('/schedules', [ScheduleController::class, 'store']);
-    Route::delete('/schedules/{id}', [ScheduleController::class, 'destroy']);
 
     // Bookings
     Route::get('/bookings', [DoctorBookingController::class, 'index']);

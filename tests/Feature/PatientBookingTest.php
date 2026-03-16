@@ -36,7 +36,6 @@ class PatientBookingTest extends TestCase
             'doctorId' => $this->doctor->id,
             'date' => $this->bookingDate,
             'timeType' => 'T1',
-            'maxNumber' => 10,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

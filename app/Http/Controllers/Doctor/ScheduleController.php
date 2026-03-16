@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Doctor;
 
-use App\DTO\ScheduleDTO;
+use App\Helpers\TimeHelper;
 use App\Http\Controllers\Controller;
 use App\Services\ScheduleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use RuntimeException;
 
 class ScheduleController extends Controller
 {
@@ -16,52 +18,38 @@ class ScheduleController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'date' => 'nullable|date',
+        ]);
+
         $doctorId = $request->user()->id;
-        $schedules = $this->scheduleService->getDoctorSchedules($doctorId);
+        $date = $validated['date'] ?? TimeHelper::nowLondon()->toDateString();
+        $schedules = $this->scheduleService->resolveDoctorScheduleForDate($doctorId, $date);
         
         return response()->json($schedules);
     }
 
     public function store(Request $request): JsonResponse
     {
-        // Accept either single schedule or array of schedules
+        $timeTypeRules = TimeHelper::timeTypeKeys();
         $validated = $request->validate([
-            'schedules' => 'required|array',
-            'schedules.*.date' => 'required|date',
-            'schedules.*.timeType' => 'required|string',
-            'schedules.*.maxNumber' => 'integer|min:1',
+            'date' => 'required|date',
+            'disabledTimeTypes' => 'nullable|array',
+            'disabledTimeTypes.*' => ['string', Rule::in($timeTypeRules)],
         ]);
 
         $doctorId = $request->user()->id;
-        $createdSchedules = [];
-
-        foreach ($validated['schedules'] as $scheduleData) {
-            $dto = new ScheduleDTO(
+        $disabledTimeTypes = $validated['disabledTimeTypes'] ?? [];
+        try {
+            $createdSchedules = $this->scheduleService->syncDoctorDayAvailability(
                 $doctorId,
-                $scheduleData['date'],
-                $scheduleData['timeType'],
-                $scheduleData['maxNumber'] ?? 5
+                $validated['date'],
+                $disabledTimeTypes
             );
-            $createdSchedules[] = $this->scheduleService->createSchedule($dto);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
         }
 
         return response()->json(['message' => 'Schedules saved successfully', 'data' => $createdSchedules], 201);
-    }
-
-    public function destroy(int $id, Request $request): JsonResponse
-    {
-        $schedule = $this->scheduleService->find($id);
-        
-        if (!$schedule || $schedule->doctorId !== $request->user()->id) {
-            return response()->json(['message' => 'Not found or unauthorized'], 404);
-        }
-
-        if ($schedule->currentNumber > 0) {
-            return response()->json(['message' => 'Cannot delete a schedule that has active bookings.'], 422);
-        }
-
-        $this->scheduleService->delete($id);
-
-        return response()->json(null, 204);
     }
 }

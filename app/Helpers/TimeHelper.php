@@ -7,16 +7,12 @@ use Carbon\Carbon;
 class TimeHelper
 {
     private const TIMEZONE = 'Europe/London';
-    private const TIME_SLOT_HOURS = [
-        'T1' => '08:00',
-        'T2' => '09:00',
-        'T3' => '10:00',
-        'T4' => '11:00',
-        'T5' => '13:00',
-        'T6' => '14:00',
-        'T7' => '15:00',
-        'T8' => '16:00',
-    ];
+    private const SLOT_START_HOUR = 8;
+    private const SLOT_END_HOUR = 17;
+    private const SLOT_INTERVAL_MINUTES = 30;
+    private const BOOKING_WINDOW_DAYS_AHEAD = 2;
+
+    private static ?array $slotHoursCache = null;
 
     /**
      * Get current time in London timezone
@@ -34,15 +30,93 @@ class TimeHelper
         return Carbon::parse($date, self::TIMEZONE);
     }
 
+    public static function timeSlotHours(): array
+    {
+        if (self::$slotHoursCache !== null) {
+            return self::$slotHoursCache;
+        }
+
+        $slots = [];
+        $index = 1;
+        $cursor = Carbon::createFromTime(self::SLOT_START_HOUR, 0, 0, self::TIMEZONE);
+        $end = Carbon::createFromTime(self::SLOT_END_HOUR, 0, 0, self::TIMEZONE);
+
+        while ($cursor->lessThan($end)) {
+            $slots["T{$index}"] = $cursor->format('H:i');
+            $cursor->addMinutes(self::SLOT_INTERVAL_MINUTES);
+            $index++;
+        }
+
+        self::$slotHoursCache = $slots;
+        return $slots;
+    }
+
+    public static function timeTypeKeys(): array
+    {
+        return array_keys(self::timeSlotHours());
+    }
+
+    public static function timeSlotAllcodeRecords(): array
+    {
+        $records = [];
+        $index = 1;
+        $cursor = Carbon::createFromTime(self::SLOT_START_HOUR, 0, 0, self::TIMEZONE);
+        $end = Carbon::createFromTime(self::SLOT_END_HOUR, 0, 0, self::TIMEZONE);
+
+        while ($cursor->lessThan($end)) {
+            $next = $cursor->copy()->addMinutes(self::SLOT_INTERVAL_MINUTES);
+            $records[] = [
+                'type' => 'TIME',
+                'key' => "T{$index}",
+                'valueEn' => "{$cursor->format('g:i A')} - {$next->format('g:i A')}",
+                'valueVi' => "{$cursor->format('H:i')} - {$next->format('H:i')}",
+            ];
+            $cursor = $next;
+            $index++;
+        }
+
+        return $records;
+    }
+
+    public static function bookingWindowStart(): Carbon
+    {
+        return self::nowLondon()->startOfDay();
+    }
+
+    public static function bookingWindowEnd(): Carbon
+    {
+        return self::nowLondon()->addDays(self::BOOKING_WINDOW_DAYS_AHEAD)->endOfDay();
+    }
+
+    public static function bookingDateStrings(): array
+    {
+        $dates = [];
+        $cursor = self::bookingWindowStart();
+        $end = self::bookingWindowEnd()->startOfDay();
+
+        while ($cursor->lessThanOrEqualTo($end)) {
+            $dates[] = $cursor->toDateString();
+            $cursor->addDay();
+        }
+
+        return $dates;
+    }
+
+    public static function isDateWithinBookingWindow(string $bookingDate): bool
+    {
+        $date = self::parseLondon($bookingDate)->startOfDay();
+        return $date->between(self::bookingWindowStart(), self::bookingWindowEnd()->startOfDay(), true);
+    }
+
     public static function isBookingWindowValid(string $bookingDate, string $timeType): bool
     {
-        if (!array_key_exists($timeType, self::TIME_SLOT_HOURS)) {
+        if (!array_key_exists($timeType, self::timeSlotHours())) {
             return false;
         }
 
         $now = self::nowLondon();
-        $today = $now->copy()->startOfDay();
-        $maxDay = $now->copy()->addDays(2)->endOfDay();
+        $today = self::bookingWindowStart();
+        $maxDay = self::bookingWindowEnd();
         $appointmentAt = self::getAppointmentDateTime($bookingDate, $timeType);
 
         if ($appointmentAt->lessThan($now)) {
@@ -54,7 +128,7 @@ class TimeHelper
 
     public static function isDoctorCancellationAllowed(string $bookingDate, string $timeType): bool
     {
-        if (!array_key_exists($timeType, self::TIME_SLOT_HOURS)) {
+        if (!array_key_exists($timeType, self::timeSlotHours())) {
             return false;
         }
 
@@ -66,9 +140,15 @@ class TimeHelper
 
     public static function getAppointmentDateTime(string $bookingDate, string $timeType): Carbon
     {
+        $slots = self::timeSlotHours();
+        $slotStart = $slots[$timeType] ?? null;
+        if ($slotStart === null) {
+            throw new \InvalidArgumentException("Invalid timeType: {$timeType}");
+        }
+
         return Carbon::createFromFormat(
             'Y-m-d H:i',
-            "{$bookingDate} " . self::TIME_SLOT_HOURS[$timeType],
+            "{$bookingDate} {$slotStart}",
             self::TIMEZONE
         );
     }

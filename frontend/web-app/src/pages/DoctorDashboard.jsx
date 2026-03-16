@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
     cancelDoctorBooking,
     clearScheduleError,
-    deleteDoctorSchedule,
     fetchDoctorBookings,
     fetchDoctorSchedules,
     markDoctorBookingDone,
@@ -12,8 +11,7 @@ import {
 } from '../store/slices/scheduleSlice';
 import apiClient from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
-
-const TIME_CODES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'];
+import { compareTimeType, DEFAULT_TIME_LABELS, TIME_CODES } from '../utils/timeSlots';
 
 const STATUS_LABELS = {
     S1: { text: 'New', className: 'bg-blue-100 text-blue-700' },
@@ -28,19 +26,20 @@ const DoctorDashboard = () => {
     const { user } = useSelector((state) => state.auth);
 
     const [timeLabels, setTimeLabels] = React.useState({});
-    const [selectedDate, setSelectedDate] = React.useState('');
-    const [maxNumber, setMaxNumber] = React.useState(5);
+    const [selectedDate, setSelectedDate] = React.useState(() => new Date().toLocaleDateString('en-CA'));
     const [selectedTimeTypes, setSelectedTimeTypes] = React.useState([]);
     const [actionLoading, setActionLoading] = React.useState(null);
 
     React.useEffect(() => {
-        if (!loadingSchedules && schedules.length === 0) {
-            dispatch(fetchDoctorSchedules());
-        }
+        if (!selectedDate) return;
+        dispatch(fetchDoctorSchedules({ date: selectedDate }));
+    }, [dispatch, selectedDate]);
+
+    React.useEffect(() => {
         if (!loadingBookings && bookings.length === 0) {
             dispatch(fetchDoctorBookings());
         }
-    }, [dispatch, loadingSchedules, schedules.length, loadingBookings, bookings.length]);
+    }, [dispatch, loadingBookings, bookings.length]);
 
     React.useEffect(() => {
         const loadTimeLabels = async () => {
@@ -58,11 +57,7 @@ const DoctorDashboard = () => {
                 }
                 setTimeLabels(labels);
             } catch {
-                const fallback = {};
-                for (const code of TIME_CODES) {
-                    fallback[code] = code;
-                }
-                setTimeLabels(fallback);
+                setTimeLabels({ ...DEFAULT_TIME_LABELS });
             }
         };
 
@@ -70,6 +65,11 @@ const DoctorDashboard = () => {
     }, []);
 
     const toggleTimeType = (timeType) => {
+        const slot = schedules.find((item) => item.timeType === timeType);
+        if (slot?.currentNumber > 0) {
+            return;
+        }
+
         setSelectedTimeTypes((prev) =>
             prev.includes(timeType)
                 ? prev.filter((item) => item !== timeType)
@@ -82,14 +82,12 @@ const DoctorDashboard = () => {
         const result = await dispatch(
             saveDoctorSchedules({
                 date: selectedDate,
-                timeTypes: selectedTimeTypes,
-                maxNumber: Number(maxNumber),
+                enabledTimeTypes: selectedTimeTypes,
             })
         );
 
         if (saveDoctorSchedules.fulfilled.match(result)) {
-            setSelectedTimeTypes([]);
-            dispatch(fetchDoctorSchedules());
+            dispatch(fetchDoctorSchedules({ date: selectedDate }));
         }
     };
 
@@ -101,10 +99,17 @@ const DoctorDashboard = () => {
         setActionLoading(null);
     };
 
-    const handleDeleteSchedule = async (id) => {
-        await dispatch(deleteDoctorSchedule(id));
-        dispatch(fetchDoctorSchedules());
-    };
+    React.useEffect(() => {
+        if (!schedules || schedules.length === 0) {
+            setSelectedTimeTypes([...TIME_CODES]);
+            return;
+        }
+        const activeCodes = schedules
+            .filter((slot) => slot.isActive !== false)
+            .map((slot) => slot.timeType)
+            .sort(compareTimeType);
+        setSelectedTimeTypes(activeCodes);
+    }, [schedules]);
 
     return (
         <div className="min-h-screen bg-background-light text-slate-900">
@@ -129,20 +134,8 @@ const DoctorDashboard = () => {
                                 <label className="block text-sm font-bold mb-1">Date</label>
                                 <input
                                     type="date"
-                                    min={new Date().toISOString().split('T')[0]}
                                     value={selectedDate}
                                     onChange={(e) => setSelectedDate(e.target.value)}
-                                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold mb-1">Max Patients / Slot</label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={maxNumber}
-                                    onChange={(e) => setMaxNumber(e.target.value)}
                                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                                     required
                                 />
@@ -150,28 +143,40 @@ const DoctorDashboard = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-bold mb-2">Time Slots</label>
+                            <label className="block text-sm font-bold mb-2">Available Time Slots (30 minutes each)</label>
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                 {TIME_CODES.map((timeType) => (
-                                    <button
-                                        key={timeType}
-                                        type="button"
-                                        onClick={() => toggleTimeType(timeType)}
-                                        className={`rounded-lg border px-2 py-2 text-xs font-bold ${
-                                            selectedTimeTypes.includes(timeType)
-                                                ? 'bg-primary text-white border-primary'
-                                                : 'bg-white border-slate-300 text-slate-700'
-                                        }`}
-                                    >
-                                        {timeLabels[timeType] || timeType}
-                                    </button>
+                                    (() => {
+                                        const slot = schedules.find((item) => item.timeType === timeType);
+                                        const isBooked = (slot?.currentNumber || 0) > 0;
+                                        const isSelected = selectedTimeTypes.includes(timeType);
+                                        return (
+                                            <button
+                                                key={timeType}
+                                                type="button"
+                                                onClick={() => toggleTimeType(timeType)}
+                                                className={`rounded-lg border px-2 py-2 text-xs font-bold ${
+                                                    isBooked
+                                                        ? 'border-amber-300 bg-amber-50 text-amber-700'
+                                                        : isSelected
+                                                            ? 'bg-primary text-white border-primary'
+                                                            : 'bg-white border-slate-300 text-slate-700'
+                                                }`}
+                                                title={isBooked ? 'This slot already has a booking and cannot be disabled.' : ''}
+                                            >
+                                                {timeLabels[timeType] || timeType}
+                                                {isBooked ? ' (Booked)' : ''}
+                                            </button>
+                                        );
+                                    })()
                                 ))}
                             </div>
+                            <p className="mt-2 text-xs text-slate-500">Selected slots are open for booking. Unselected slots are disabled for this date.</p>
                         </div>
 
                         <button
                             type="submit"
-                            disabled={!selectedDate || selectedTimeTypes.length === 0 || submitting}
+                            disabled={!selectedDate || submitting}
                             className="px-4 py-2 rounded-lg bg-primary text-white font-black disabled:opacity-60"
                         >
                             {submitting ? 'Saving...' : 'Save Schedule'}
@@ -180,7 +185,7 @@ const DoctorDashboard = () => {
                 </section>
 
                 <section className="rounded-xl border border-slate-200 bg-white p-5">
-                    <h2 className="text-xl font-black mb-3">My Schedules</h2>
+                    <h2 className="text-xl font-black mb-3">Schedule Overview ({selectedDate})</h2>
                     {loadingSchedules ? (
                         <p className="text-slate-500">Loading schedules...</p>
                     ) : schedules.length === 0 ? (
@@ -189,21 +194,28 @@ const DoctorDashboard = () => {
                         <div className="space-y-2">
                             {schedules
                                 .slice()
-                                .sort((a, b) => `${a.date}-${a.timeType}`.localeCompare(`${b.date}-${b.timeType}`))
+                                .sort((a, b) => compareTimeType(a.timeType, b.timeType))
                                 .map((schedule) => (
-                                    <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3">
+                                    <div key={`${schedule.date}-${schedule.timeType}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3">
                                         <div className="text-sm">
                                             <p className="font-bold">{schedule.date} - {timeLabels[schedule.timeType] || schedule.timeType}</p>
-                                            <p className="text-slate-500">Booked: {schedule.currentNumber}/{schedule.maxNumber}</p>
+                                            <p className="text-slate-500">
+                                                {schedule.currentNumber > 0
+                                                    ? 'Booked'
+                                                    : schedule.isActive === false
+                                                        ? 'Disabled'
+                                                        : 'Available'}
+                                            </p>
                                         </div>
-                                        <button
-                                            onClick={() => handleDeleteSchedule(schedule.id)}
-                                            disabled={schedule.currentNumber > 0}
-                                            className="px-3 py-1 rounded-lg bg-red-100 text-red-700 text-xs font-bold disabled:opacity-50"
-                                            title={schedule.currentNumber > 0 ? 'Cannot delete schedule with active bookings' : 'Delete schedule'}
-                                        >
-                                            Delete
-                                        </button>
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                            schedule.currentNumber > 0
+                                                ? 'bg-amber-100 text-amber-700'
+                                                : schedule.isActive === false
+                                                    ? 'bg-slate-100 text-slate-600'
+                                                    : 'bg-emerald-100 text-emerald-700'
+                                        }`}>
+                                            {schedule.currentNumber > 0 ? 'Booked' : schedule.isActive === false ? 'Disabled' : 'Open'}
+                                        </span>
                                     </div>
                                 ))}
                         </div>

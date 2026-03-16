@@ -7,11 +7,6 @@ use Illuminate\Database\Eloquent\Collection;
 
 class ScheduleRepository
 {
-    public function getAll(): Collection
-    {
-        return Schedule::all();
-    }
-
     public function findById(int $id): ?Schedule
     {
         return Schedule::find($id);
@@ -31,18 +26,21 @@ class ScheduleRepository
         return false;
     }
 
-    public function delete(int $id): bool
+    public function getByDoctorAndDate(int $doctorId, string $date): Collection
     {
-        $schedule = $this->findById($id);
-        if ($schedule) {
-            return (bool) $schedule->delete();
-        }
-        return false;
+        return Schedule::query()
+            ->where('doctorId', $doctorId)
+            ->whereDate('date', $date)
+            ->get();
     }
 
-    public function getByDoctorId(int $doctorId): Collection
+    public function getByDoctorAndDateRange(int $doctorId, string $startDate, string $endDate): Collection
     {
-        return Schedule::where('doctorId', $doctorId)->get();
+        return Schedule::query()
+            ->where('doctorId', $doctorId)
+            ->whereDate('date', '>=', $startDate)
+            ->whereDate('date', '<=', $endDate)
+            ->get();
     }
 
     public function findByDoctorAndSlot(int $doctorId, string $date, string $timeType): ?Schedule
@@ -64,9 +62,4 @@ class ScheduleRepository
             ->first();
     }
 
-    // Add locking method for transactions to prevent overbooking
-    public function findByIdForUpdate(int $id): ?Schedule
-    {
-        return Schedule::lockForUpdate()->find($id);
-    }
 }
