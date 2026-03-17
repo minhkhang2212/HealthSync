@@ -228,6 +228,56 @@ store
 - MySQL
 - XAMPP
 
+### Local Demo Data Bootstrap
+
+Schema and master data stay in Laravel migrations/seeders.
+
+- `php artisan migrate` creates the tables
+- `php artisan db:seed` seeds `roles` and `allcodes`
+- [`database/sql/demo_data.sql`](/d:/xampp_new/htdocs/healthsync/database/sql/demo_data.sql) imports demo clinics, specialties, doctors, patients, schedules, bookings, and histories
+
+Recommended local bootstrap flow:
+
+```text
+1. Create an empty `healthsync` database in phpMyAdmin
+2. Run php artisan migrate
+3. Run php artisan db:seed
+4. Import database/sql/demo_data.sql in phpMyAdmin
+```
+
+Notes:
+
+- `DatabaseSeeder` no longer creates demo users directly
+- The SQL file uses upsert logic for demo catalog data and resolves demo doctor and patient relations by email, so it is safer to re-import on an existing local database
+- Demo doctor and clinic images are stored as local public asset paths such as `/demo-images/doctors/...` and `/demo-images/clinics/...`
+- Demo login password for imported accounts: `password123`
+
+To add your own images to SQL demo data:
+
+```text
+1. Put the image file in public/demo-images/doctors or public/demo-images/clinics
+2. Store the relative public path in the SQL file, for example:
+   /demo-images/doctors/my-doctor-photo.jpg
+   /demo-images/clinics/my-clinic-cover.png
+3. Re-import database/sql/demo_data.sql
+```
+
+Demo accounts:
+
+```text
+admin@healthsync.com
+doctor1@healthsync.com
+doctor2@healthsync.com
+doctor3@healthsync.com
+doctor4@healthsync.com
+doctor5@healthsync.com
+doctor6@healthsync.com
+doctor7@healthsync.com
+doctor8@healthsync.com
+patient1@healthsync.com
+patient2@healthsync.com
+```
+
 ---
 
 ## 10. Main Tables
