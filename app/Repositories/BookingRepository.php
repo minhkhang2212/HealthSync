@@ -25,6 +25,29 @@ class BookingRepository
         return $this->baseQuery()->find($id);
     }
 
+    public function findByIdForUpdate(int $id): ?Booking
+    {
+        return Booking::query()
+            ->whereKey($id)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    public function findByStripeCheckoutSessionId(string $sessionId): ?Booking
+    {
+        return $this->baseQuery()
+            ->where('stripeCheckoutSessionId', $sessionId)
+            ->first();
+    }
+
+    public function findByStripeCheckoutSessionIdForUpdate(string $sessionId): ?Booking
+    {
+        return Booking::query()
+            ->where('stripeCheckoutSessionId', $sessionId)
+            ->lockForUpdate()
+            ->first();
+    }
+
     public function create(array $data): Booking
     {
         return Booking::create($data);

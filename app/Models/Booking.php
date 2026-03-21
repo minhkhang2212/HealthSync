@@ -16,9 +16,18 @@ class Booking extends Model
         'patientId',
         'doctorId',
         'patientContactEmail',
+        'bookingDetails',
         'date',
         'timeType',
         'statusId',
+        'paymentMethod',
+        'paymentStatus',
+        'paymentAmount',
+        'paymentCurrency',
+        'stripeCheckoutSessionId',
+        'stripePaymentIntentId',
+        'paymentExpiresAt',
+        'paidAt',
         'confirmedAt',
         'confirmationAttachment',
         'prescriptionSentAt',
@@ -26,6 +35,10 @@ class Booking extends Model
     ];
 
     protected $casts = [
+        'bookingDetails' => 'array',
+        'paymentAmount' => 'integer',
+        'paymentExpiresAt' => 'datetime',
+        'paidAt' => 'datetime',
         'confirmedAt' => 'datetime',
         'prescriptionSentAt' => 'datetime',
     ];

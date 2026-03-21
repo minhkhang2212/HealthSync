@@ -2,7 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import PatientDashboard from './pages/PatientDashboard';
+import ClinicDirectory from './pages/ClinicDirectory';
+import ClinicDetail from './pages/ClinicDetail';
 import DoctorDetail from './pages/DoctorDetail';
+import SpecialtyDetail from './pages/SpecialtyDetail';
 import DoctorDashboard from './pages/DoctorDashboard';
 import DoctorAppointments from './pages/DoctorAppointments';
 import Login from './pages/Login';
@@ -50,7 +53,10 @@ const AppRouter = () => {
                 {/* Patient Routes */}
                 <Route path="/patient" element={<ProtectedRoute allowedRoles={['R3']} />}>
                     <Route index element={<PatientDashboard />} />
+                    <Route path="clinics" element={<ClinicDirectory />} />
+                    <Route path="clinics/:id" element={<ClinicDetail />} />
                     <Route path="doctor/:id" element={<DoctorDetail />} />
+                    <Route path="specialties/:id" element={<SpecialtyDetail />} />
                 </Route>
 
                 {/* Doctor Routes */}

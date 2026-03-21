@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'frontend' => [
+        'url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
+    ],
+
+    'stripe' => [
+        'secret_key' => env('STRIPE_SECRET_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'webhook_tolerance' => (int) env('STRIPE_WEBHOOK_TOLERANCE', 300),
+    ],
+
 ];

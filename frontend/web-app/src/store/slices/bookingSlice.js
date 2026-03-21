@@ -78,7 +78,15 @@ const bookingSlice = createSlice({
             })
             .addCase(createBooking.fulfilled, (state, action) => {
                 state.error = null;
-                state.bookings.push(action.payload);
+                const booking = action.payload?.booking || action.payload;
+                if (booking?.id) {
+                    const existingIndex = state.bookings.findIndex((item) => item.id === booking.id);
+                    if (existingIndex >= 0) {
+                        state.bookings[existingIndex] = booking;
+                    } else {
+                        state.bookings.push(booking);
+                    }
+                }
             })
             .addCase(createBooking.rejected, (state, action) => {
                 state.error = action.payload;

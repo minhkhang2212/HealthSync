@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ClinicController;
 use App\Http\Controllers\Api\DoctorProfileController;
 use App\Http\Controllers\Api\HistoryController;
 use App\Http\Controllers\Api\SpecialtyController;
+use App\Http\Controllers\StripeWebhookController;
 
 // Authentication Routes
 Route::prefix('auth')->group(function () {
@@ -42,6 +43,8 @@ $publicCatalogRoutes = function (): void {
 $publicCatalogRoutes();
 
 Route::prefix('v1')->group($publicCatalogRoutes);
+
+Route::post('/stripe/webhook', StripeWebhookController::class);
 
 // Compatibility endpoint from README: POST /api/bookings (patient booking)
 Route::middleware(['auth:sanctum', 'role:R3'])->group(function () {

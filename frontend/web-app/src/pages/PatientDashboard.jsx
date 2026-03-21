@@ -8,6 +8,7 @@ import { fetchClinics } from '../store/slices/clinicSlice';
 import { cancelBooking, fetchBookings } from '../store/slices/bookingSlice';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
+import { canPatientCancelBooking, getPaymentSummary, isOnlinePaymentPending } from '../utils/bookingPayments';
 import { DEFAULT_TIME_LABELS } from '../utils/timeSlots';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
@@ -67,6 +68,13 @@ const getBookingStatusMeta = (booking, statusLabels) => {
         return {
             label: 'Confirmed',
             className: CONFIRMED_BADGE_CLASS,
+        };
+    }
+
+    if (isOnlinePaymentPending(booking)) {
+        return {
+            label: 'Awaiting payment',
+            className: 'bg-amber-50 text-amber-700 border-amber-200',
         };
     }
 
@@ -229,7 +237,6 @@ const PatientDashboard = () => {
     const [statusLabels, setStatusLabels] = React.useState(DEFAULT_STATUS_LABELS);
     const [timeLabels, setTimeLabels] = React.useState(DEFAULT_TIME_LABELS);
     const [showAllSpecialties, setShowAllSpecialties] = React.useState(false);
-    const [showAllClinics, setShowAllClinics] = React.useState(false);
     const [showAllDoctors, setShowAllDoctors] = React.useState(false);
 
     const apiAssetBase = React.useMemo(() => getApiAssetBase(), []);
@@ -406,6 +413,7 @@ const PatientDashboard = () => {
         [clinics, clinicDoctorCount]
     );
     const topClinics = orderedClinics.slice(0, 3);
+    const clinicCarouselItems = orderedClinics;
     const currentYear = new Date().getFullYear();
     const updatedDate = new Date().toLocaleDateString('en-GB');
 
@@ -434,14 +442,6 @@ const PatientDashboard = () => {
     const handleApplyFilters = (event) => {
         event.preventDefault();
         setAppliedFilters(filters);
-        setShowAllDoctors(false);
-        moveToDoctors();
-    };
-
-    const handleQuickFilter = (key, value) => {
-        const next = { ...filters, [key]: normalizeId(value) };
-        setFilters(next);
-        setAppliedFilters(next);
         setShowAllDoctors(false);
         moveToDoctors();
     };
@@ -497,7 +497,7 @@ const PatientDashboard = () => {
             <button
                 key={`${keyPrefix}-${specialty.id}`}
                 type="button"
-                onClick={() => handleQuickFilter('specialtyId', specialty.id)}
+                onClick={() => navigate(`/patient/specialties/${specialty.id}`)}
                 className="min-h-[320px] w-full rounded-3xl border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-[#7fd2df]"
             >
                 <div className="rounded-2xl border border-slate-100 bg-[#f3f7f8] p-3">
@@ -511,7 +511,30 @@ const PatientDashboard = () => {
                 </div>
                 <p className="mt-4 min-h-12 text-lg font-black leading-6 text-slate-900">{specialty.name}</p>
                 <p className="mt-1 text-xs font-semibold text-slate-500">{doctorCount} doctor(s)</p>
+                <p className="mt-3 text-xs font-black uppercase tracking-[0.14em] text-primary">View Specialty</p>
             </button>
+        );
+    };
+
+    const renderClinicCard = (clinic, keyPrefix = 'clinic') => {
+        const imageSrc = resolveImageSource(clinic.image, apiAssetBase);
+
+        return (
+            <article key={`${keyPrefix}-${clinic.id}`} className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                {imageSrc ? <img src={imageSrc} alt={clinic.name} className="h-44 w-full object-cover" /> : <div className="h-44 w-full bg-gradient-to-br from-slate-100 to-slate-200" />}
+                <div className="p-4">
+                    <p className="font-black">{clinic.name}</p>
+                    <p className="text-sm text-slate-500">{clinic.address || 'Address updating'}</p>
+                    <p className="mt-1 text-xs text-slate-500">{clinicDoctorCount.get(normalizeId(clinic.id)) || 0} doctor(s)</p>
+                    <button
+                        type="button"
+                        onClick={() => navigate(`/patient/clinics/${clinic.id}`)}
+                        className="mt-3 w-full rounded-xl border border-primary px-3 py-2 text-sm font-black text-primary hover:bg-blue-50"
+                    >
+                        View Clinic
+                    </button>
+                </div>
+            </article>
         );
     };
 
@@ -533,6 +556,7 @@ const PatientDashboard = () => {
                     </div>
                     <nav className="hidden items-center gap-2 md:flex">
                         <button onClick={moveToDoctors} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Find Doctors</button>
+                        <button onClick={() => navigate('/patient/clinics')} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Clinics</button>
                         <button onClick={moveToHowItWorks} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">How It Works</button>
                         <button onClick={() => setView('appointments')} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">My Appointments</button>
                     </nav>
@@ -543,6 +567,7 @@ const PatientDashboard = () => {
                         </button>
                         {menuOpen && (
                             <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-md">
+                                <button onClick={() => { navigate('/patient/clinics'); setMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100">Clinics</button>
                                 <button onClick={() => { setView('appointments'); setMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100">My Appointments</button>
                                 <button onClick={handleLogout} className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">Logout</button>
                             </div>
@@ -697,13 +722,16 @@ const PatientDashboard = () => {
                             <div className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
                                 <section className="space-y-4">
                             <div className="flex items-center justify-between gap-3">
-                                <h2 className="text-2xl font-black">Top Clinics</h2>
+                                <div>
+                                    <h2 className="text-2xl font-black">Top Clinics</h2>
+                                    <p className="text-xs font-semibold text-slate-500">{orderedClinics.length} clinic(s)</p>
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => setShowAllClinics((prev) => !prev)}
-                                    className="rounded-2xl bg-cyan-100 px-4 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-200"
+                                    onClick={() => navigate('/patient/clinics')}
+                                    className="rounded-2xl bg-[#d9f2f7] px-5 py-2 text-sm font-bold text-[#2d95a8] hover:bg-[#c9eaf2]"
                                 >
-                                    {showAllClinics ? 'See less' : 'See more'}
+                                    View all clinics
                                 </button>
                             </div>
                             {clinicError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{clinicError}</div>}
@@ -711,23 +739,6 @@ const PatientDashboard = () => {
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">Loading clinics...</div>
                             ) : orderedClinics.length === 0 ? (
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">No clinics available.</div>
-                            ) : showAllClinics ? (
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    {orderedClinics.map((clinic) => {
-                                        const imageSrc = resolveImageSource(clinic.image, apiAssetBase);
-                                        return (
-                                            <article key={`all-clinic-${clinic.id}`} className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                                {imageSrc ? <img src={imageSrc} alt={clinic.name} className="h-44 w-full object-cover" /> : <div className="h-44 w-full bg-gradient-to-br from-slate-100 to-slate-200" />}
-                                                <div className="p-4">
-                                                    <p className="font-black">{clinic.name}</p>
-                                                    <p className="text-sm text-slate-500">{clinic.address || 'Address updating'}</p>
-                                                    <p className="mt-1 text-xs text-slate-500">{clinicDoctorCount.get(normalizeId(clinic.id)) || 0} doctor(s)</p>
-                                                    <button onClick={() => handleQuickFilter('clinicId', clinic.id)} className="mt-3 w-full rounded-xl border border-primary px-3 py-2 text-sm font-black text-primary hover:bg-blue-50">View Doctors</button>
-                                                </div>
-                                            </article>
-                                        );
-                                    })}
-                                </div>
                             ) : (
                                 <div className="relative px-10 py-2">
                                     <button
@@ -752,26 +763,15 @@ const PatientDashboard = () => {
                                         spaceBetween={16}
                                         breakpoints={{
                                             0: { slidesPerView: 1 },
-                                            768: { slidesPerView: 2 },
-                                            1200: { slidesPerView: 3 },
+                                            640: { slidesPerView: 2 },
+                                            1024: { slidesPerView: 3 },
                                         }}
                                     >
-                                        {topClinics.map((clinic) => {
-                                            const imageSrc = resolveImageSource(clinic.image, apiAssetBase);
-                                            return (
-                                                <SwiperSlide key={clinic.id}>
-                                                    <article className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                                        {imageSrc ? <img src={imageSrc} alt={clinic.name} className="h-44 w-full object-cover" /> : <div className="h-44 w-full bg-gradient-to-br from-slate-100 to-slate-200" />}
-                                                        <div className="p-4">
-                                                            <p className="font-black">{clinic.name}</p>
-                                                            <p className="text-sm text-slate-500">{clinic.address || 'Address updating'}</p>
-                                                            <p className="mt-1 text-xs text-slate-500">{clinicDoctorCount.get(normalizeId(clinic.id)) || 0} doctor(s)</p>
-                                                            <button onClick={() => handleQuickFilter('clinicId', clinic.id)} className="mt-3 w-full rounded-xl border border-primary px-3 py-2 text-sm font-black text-primary hover:bg-blue-50">View Doctors</button>
-                                                        </div>
-                                                    </article>
-                                                </SwiperSlide>
-                                            );
-                                        })}
+                                        {clinicCarouselItems.map((clinic) => (
+                                            <SwiperSlide key={clinic.id}>
+                                                {renderClinicCard(clinic)}
+                                            </SwiperSlide>
+                                        ))}
                                     </Swiper>
                                 </div>
                             )}
@@ -944,7 +944,8 @@ const PatientDashboard = () => {
                                 {sortedBookings.map((booking) => {
                                     const doctor = doctorById.get(normalizeId(booking.doctorId));
                                     const status = getBookingStatusMeta(booking, statusLabels);
-                                    const canCancel = booking.statusId === 'S1' && !booking.confirmedAt;
+                                    const paymentSummary = getPaymentSummary(booking);
+                                    const canCancel = canPatientCancelBooking(booking);
                                     return (
                                         <article key={booking.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                                             <div className="flex items-center justify-between gap-2">
@@ -957,9 +958,20 @@ const PatientDashboard = () => {
                                             <p className="mt-2 text-sm text-slate-600">Date: {formatBookingDate(booking.date)}</p>
                                             <p className="text-sm text-slate-600">Time: {timeLabels[booking.timeType] || booking.timeType}</p>
                                             <p className="text-sm text-slate-600">Contact email: {booking.patientContactEmail || user?.email || 'Not provided'}</p>
+                                            <p className="text-sm text-slate-600">Payment: {paymentSummary.label}</p>
                                             {booking.confirmedAt && booking.statusId === 'S1' && (
                                                 <p className="mt-3 text-sm font-medium text-blue-700">
                                                     Your doctor has confirmed this appointment.
+                                                </p>
+                                            )}
+                                            {!booking.confirmedAt && paymentSummary.tone === 'pending' && (
+                                                <p className="mt-3 text-sm font-medium text-amber-700">
+                                                    Online payment is still pending. The clinic cannot confirm this booking until payment completes.
+                                                </p>
+                                            )}
+                                            {!booking.confirmedAt && paymentSummary.tone === 'paid' && (
+                                                <p className="mt-3 text-sm font-medium text-emerald-700">
+                                                    Your payment was received successfully. The clinic can now confirm the appointment.
                                                 </p>
                                             )}
                                             {canCancel && (

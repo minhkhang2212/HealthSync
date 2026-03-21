@@ -24,7 +24,7 @@ class DoctorProfileController extends Controller
         $query = User::query()
             ->where('roleId', 'R2')
             ->where('isActive', true)
-            ->with(['doctorInfor', 'doctorClinicSpecialties.clinic', 'doctorClinicSpecialties.specialty']);
+            ->with(['doctorInfor.markdowns', 'doctorClinicSpecialties.clinic', 'doctorClinicSpecialties.specialty']);
 
         if (!empty($validated['search'])) {
             $search = $validated['search'];
@@ -59,7 +59,7 @@ class DoctorProfileController extends Controller
         $doctor = User::query()
             ->where('roleId', 'R2')
             ->where('isActive', true)
-            ->with(['doctorInfor', 'doctorClinicSpecialties.clinic', 'doctorClinicSpecialties.specialty'])
+            ->with(['doctorInfor.markdowns', 'doctorClinicSpecialties.clinic', 'doctorClinicSpecialties.specialty'])
             ->find($id);
 
         if (!$doctor) {

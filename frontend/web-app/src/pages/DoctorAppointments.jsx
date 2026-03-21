@@ -10,6 +10,7 @@ import {
 } from '../store/slices/scheduleSlice';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
+import { canDoctorConfirmBooking, getPaymentSummary, isOnlinePaymentPaid, isOnlinePaymentPending } from '../utils/bookingPayments';
 import { DEFAULT_TIME_LABELS } from '../utils/timeSlots';
 import DoctorShell from '../components/layout/DoctorShell';
 
@@ -61,6 +62,9 @@ const getStatusPresentation = (booking) => {
     }
     if (booking.confirmedAt) {
         return { text: 'Confirmed', className: 'bg-blue-100 text-blue-700' };
+    }
+    if (isOnlinePaymentPending(booking)) {
+        return { text: 'Awaiting payment', className: 'bg-amber-100 text-amber-700' };
     }
     return { text: 'New', className: 'bg-slate-100 text-slate-700' };
 };
@@ -373,8 +377,9 @@ const DoctorAppointments = () => {
                     <div className="space-y-4">
                         {filteredBookings.map((booking) => {
                             const status = getStatusPresentation(booking);
-                            const canConfirm = booking.statusId === 'S1' && !booking.confirmedAt;
-                            const canCancel = canConfirm;
+                            const paymentSummary = getPaymentSummary(booking);
+                            const canConfirm = canDoctorConfirmBooking(booking);
+                            const canCancel = booking.statusId === 'S1' && !booking.confirmedAt && !isOnlinePaymentPaid(booking);
                             const canSendPrescription = booking.statusId === 'S1' && !!booking.confirmedAt;
                             const canMarkNoShow = booking.statusId === 'S1' && !!booking.confirmedAt;
                             const recipientEmail = getRecipientEmail(booking);
@@ -390,9 +395,16 @@ const DoctorAppointments = () => {
                                             <p className="mt-3 text-sm text-slate-600">
                                                 Date: {formatReadableDate(booking.date)} | Time: {booking.timeLabel}
                                             </p>
+                                            <p className="mt-1 text-sm text-slate-600">Payment: {paymentSummary.label}</p>
                                         </div>
                                         <span className={`rounded-full px-3 py-1 text-xs font-black ${status.className}`}>{status.text}</span>
                                     </div>
+
+                                    {paymentSummary.tone === 'pending' && (
+                                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                                            Payment is still pending. This appointment cannot be confirmed until Stripe marks it as paid.
+                                        </div>
+                                    )}
 
                                     {booking.confirmedAt && booking.statusId === 'S1' && (
                                         <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">

@@ -100,6 +100,20 @@ class BookingService
         });
     }
 
+    public function attachStripeCheckoutSession(
+        int $bookingId,
+        string $sessionId,
+        ?string $paymentIntentId,
+        \DateTimeInterface $expiresAt
+    ): Booking {
+        return $this->update($bookingId, [
+            'stripeCheckoutSessionId' => $sessionId,
+            'stripePaymentIntentId' => $paymentIntentId,
+            'paymentExpiresAt' => $expiresAt,
+            'paymentStatus' => 'pending',
+        ]);
+    }
+
     public function update(int $id, array $payload): Booking
     {
         if (!$this->bookingRepository->update($id, $payload)) {
@@ -125,29 +139,23 @@ class BookingService
             throw new Exception("Booking cannot be cancelled from the current status.");
         }
 
+        if ($booking->paymentMethod === 'stripe' && $booking->paymentStatus === 'paid') {
+            throw new Exception("Online-paid bookings cannot be cancelled automatically. Please contact the clinic.");
+        }
+
         // Patients can cancel anytime, Doctors have a 24h rule
         if ($role === 'R2' && !TimeHelper::isDoctorCancellationAllowed($booking->date, $booking->timeType)) {
             throw new Exception("Doctors must cancel at least 24 hours in advance.");
         }
 
         return DB::transaction(function () use ($booking) {
-            // Update booking status to 'S2' (Cancelled)
-            $this->bookingRepository->update($booking->id, ['statusId' => 'S2']);
-
-            // Re-open the slot when the booking is cancelled
-            $lockedSchedule = $this->scheduleRepository->findByDoctorAndSlotForUpdate(
-                $booking->doctorId,
-                $booking->date,
-                $booking->timeType
-            );
-
-            if ($lockedSchedule) {
-                if ($lockedSchedule->currentNumber > 0) {
-                    $this->scheduleRepository->update($lockedSchedule->id, [
-                        'currentNumber' => 0,
-                    ]);
-                }
+            $payload = ['statusId' => 'S2'];
+            if ($booking->paymentMethod === 'stripe' && $booking->paymentStatus === 'pending') {
+                $payload['paymentStatus'] = 'cancelled';
             }
+
+            $this->bookingRepository->update($booking->id, $payload);
+            $this->releaseSlot($booking);
 
             $updatedBooking = $this->find($booking->id);
             if (!$updatedBooking) {
@@ -167,6 +175,10 @@ class BookingService
 
         if ($booking->statusId !== 'S1') {
             throw new RuntimeException("Only new bookings can be confirmed.");
+        }
+
+        if ($booking->paymentMethod === 'stripe' && $booking->paymentStatus !== 'paid') {
+            throw new RuntimeException("This booking is awaiting online payment.");
         }
 
         if ($booking->confirmedAt !== null) {
@@ -216,10 +228,85 @@ class BookingService
         return $this->update($id, ['statusId' => 'S4']);
     }
 
+    public function markStripeCheckoutCompleted(string $sessionId, ?string $paymentIntentId = null): ?Booking
+    {
+        if ($sessionId === '') {
+            return null;
+        }
+
+        return DB::transaction(function () use ($sessionId, $paymentIntentId) {
+            $booking = $this->bookingRepository->findByStripeCheckoutSessionIdForUpdate($sessionId);
+            if (!$booking) {
+                return null;
+            }
+
+            if ($booking->statusId === 'S2') {
+                return $this->find($booking->id);
+            }
+
+            $payload = [
+                'paymentStatus' => 'paid',
+                'paidAt' => now('Europe/London'),
+                'paymentExpiresAt' => null,
+            ];
+
+            if ($paymentIntentId !== null && $paymentIntentId !== '') {
+                $payload['stripePaymentIntentId'] = $paymentIntentId;
+            }
+
+            $this->bookingRepository->update($booking->id, $payload);
+
+            return $this->find($booking->id);
+        });
+    }
+
+    public function markStripeCheckoutExpired(string $sessionId): ?Booking
+    {
+        if ($sessionId === '') {
+            return null;
+        }
+
+        return DB::transaction(function () use ($sessionId) {
+            $booking = $this->bookingRepository->findByStripeCheckoutSessionIdForUpdate($sessionId);
+            if (!$booking) {
+                return null;
+            }
+
+            if ($booking->statusId === 'S2' || $booking->paymentStatus !== 'pending') {
+                return $this->find($booking->id);
+            }
+
+            $this->bookingRepository->update($booking->id, [
+                'statusId' => 'S2',
+                'paymentStatus' => 'expired',
+                'paymentExpiresAt' => null,
+            ]);
+
+            $this->releaseSlot($booking);
+
+            return $this->find($booking->id);
+        });
+    }
+
     private function preventOverbooking($schedule): void
     {
         if ($schedule->currentNumber >= 1) {
             throw new Exception("This time slot is already booked.");
+        }
+    }
+
+    private function releaseSlot(Booking $booking): void
+    {
+        $lockedSchedule = $this->scheduleRepository->findByDoctorAndSlotForUpdate(
+            $booking->doctorId,
+            $booking->date,
+            $booking->timeType
+        );
+
+        if ($lockedSchedule && $lockedSchedule->currentNumber > 0) {
+            $this->scheduleRepository->update($lockedSchedule->id, [
+                'currentNumber' => 0,
+            ]);
         }
     }
 }
