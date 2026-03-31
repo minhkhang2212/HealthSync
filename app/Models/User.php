@@ -81,4 +81,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(DoctorClinicSpecialty::class, 'doctorId');
     }
+
+    public function aiTriageSessions(): HasMany
+    {
+        return $this->hasMany(AiTriageSession::class, 'patientId');
+    }
 }

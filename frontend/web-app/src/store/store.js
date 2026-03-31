@@ -6,6 +6,7 @@ import clinicReducer from './slices/clinicSlice';
 import specialtyReducer from './slices/specialtySlice';
 import doctorReducer from './slices/doctorSlice';
 import scheduleReducer from './slices/scheduleSlice';
+import aiReducer from './slices/aiSlice';
 
 export const store = configureStore({
     reducer: {
@@ -16,5 +17,6 @@ export const store = configureStore({
         specialty: specialtyReducer,
         doctor: doctorReducer,
         schedule: scheduleReducer,
+        ai: aiReducer,
     },
 });

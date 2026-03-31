@@ -12,6 +12,7 @@ import clinicReducer from '../store/slices/clinicSlice';
 import specialtyReducer from '../store/slices/specialtySlice';
 import doctorReducer from '../store/slices/doctorSlice';
 import scheduleReducer from '../store/slices/scheduleSlice';
+import aiReducer from '../store/slices/aiSlice';
 
 export function renderWithProviders(
     ui,
@@ -27,6 +28,7 @@ export function renderWithProviders(
                 specialty: specialtyReducer,
                 doctor: doctorReducer,
                 schedule: scheduleReducer,
+                ai: aiReducer,
             },
             preloadedState,
         }),

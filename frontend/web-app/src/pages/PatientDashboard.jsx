@@ -1,11 +1,13 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../store/slices/authSlice';
+import { resetAiSession } from '../store/slices/aiSlice';
 import { fetchSpecialties } from '../store/slices/specialtySlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
 import { fetchClinics } from '../store/slices/clinicSlice';
 import { cancelBooking, fetchBookings } from '../store/slices/bookingSlice';
+import PatientAiEntryCard from '../components/ai/PatientAiEntryCard';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 import { canPatientCancelBooking, getPaymentSummary, isOnlinePaymentPending } from '../utils/bookingPayments';
@@ -107,6 +109,13 @@ const normalizeSearchText = (value) =>
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase();
+
+const buildAiDashboardFilters = (prefill) => ({
+    search: prefill?.specialtyName || '',
+    location: prefill?.locationQuery || '',
+    specialtyId: prefill?.specialtyId ? String(prefill.specialtyId) : '',
+    clinicId: '',
+});
 
 const resolveSpecialtyVisual = (specialty) => {
     const searchText = normalizeSearchText(specialty?.name);
@@ -220,6 +229,7 @@ const resolveImageSource = (value, apiAssetBase) => {
 const PatientDashboard = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const location = useLocation();
     const doctorsRef = React.useRef(null);
     const howItWorksRef = React.useRef(null);
 
@@ -311,6 +321,27 @@ const PatientDashboard = () => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [menuOpen]);
+
+    React.useEffect(() => {
+        const prefill = location.state?.aiPrefill;
+        if (!prefill) return;
+
+        const nextFilters = buildAiDashboardFilters(prefill);
+        setView('dashboard');
+        setFilters(nextFilters);
+        setAppliedFilters(nextFilters);
+        setShowAllDoctors(false);
+
+        const scrollTimer = window.setTimeout(() => {
+            if (typeof doctorsRef.current?.scrollIntoView === 'function') {
+                doctorsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 40);
+
+        navigate(location.pathname, { replace: true });
+
+        return () => window.clearTimeout(scrollTimer);
+    }, [location.pathname, location.state, navigate]);
 
     const doctorById = React.useMemo(() => {
         const map = new Map();
@@ -419,15 +450,24 @@ const PatientDashboard = () => {
 
     const moveToDoctors = () => {
         setView('dashboard');
-        setTimeout(() => doctorsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+        setTimeout(() => {
+            if (typeof doctorsRef.current?.scrollIntoView === 'function') {
+                doctorsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 40);
     };
 
     const moveToHowItWorks = () => {
         setView('dashboard');
-        setTimeout(() => howItWorksRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+        setTimeout(() => {
+            if (typeof howItWorksRef.current?.scrollIntoView === 'function') {
+                howItWorksRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 40);
     };
 
     const handleLogout = async () => {
+        dispatch(resetAiSession());
         await dispatch(logoutUser());
         navigate('/login');
     };
@@ -557,6 +597,16 @@ const PatientDashboard = () => {
                     <nav className="hidden items-center gap-2 md:flex">
                         <button onClick={moveToDoctors} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Find Doctors</button>
                         <button onClick={() => navigate('/patient/clinics')} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Clinics</button>
+                        <button
+                            onClick={() => navigate('/patient/ai')}
+                            className="group inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition hover:bg-blue-50"
+                        >
+                            <span className="material-symbols-outlined text-[18px] text-amber-500 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12">auto_awesome</span>
+                            <span>AI Support</span>
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700 transition-transform duration-200 group-hover:scale-105">
+                                New
+                            </span>
+                        </button>
                         <button onClick={moveToHowItWorks} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">How It Works</button>
                         <button onClick={() => setView('appointments')} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">My Appointments</button>
                     </nav>
@@ -568,6 +618,18 @@ const PatientDashboard = () => {
                         {menuOpen && (
                             <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-md">
                                 <button onClick={() => { navigate('/patient/clinics'); setMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100">Clinics</button>
+                                <button
+                                    onClick={() => { navigate('/patient/ai'); setMenuOpen(false); }}
+                                    className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-primary transition hover:bg-blue-50"
+                                >
+                                    <span className="inline-flex items-center gap-2 font-semibold">
+                                        <span className="material-symbols-outlined text-[18px] text-amber-500 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12">auto_awesome</span>
+                                        AI Support
+                                    </span>
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700 transition-transform duration-200 group-hover:scale-105">
+                                        New
+                                    </span>
+                                </button>
                                 <button onClick={() => { setView('appointments'); setMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100">My Appointments</button>
                                 <button onClick={handleLogout} className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">Logout</button>
                             </div>
@@ -586,11 +648,9 @@ const PatientDashboard = () => {
                                 <div className="space-y-4">
                                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Healthcare Reimagined</p>
                                     <h1 className="text-3xl font-black sm:text-5xl">Your Health,<br /><span className="text-primary">Simplified.</span></h1>
-                                    <p className="text-slate-600">Hi {user?.name || 'Patient'}, only real data from your account is shown below.</p>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xl font-black">{doctors.length}</p><p className="text-xs text-slate-500">Doctors</p></div>
-                                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xl font-black">{clinics.length}</p><p className="text-xs text-slate-500">Clinics</p></div>
-                                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xl font-black">{bookings.length}</p><p className="text-xs text-slate-500">Bookings</p></div>
+                                    <p className="text-slate-600">Hi {user?.name || 'Patient'}, connect with our top UK specialists in minutes. Book appointments, manage health records, and get professional care at your fingertips.</p>
+                                    <div className="pt-2">
+                                        <PatientAiEntryCard />
                                     </div>
                                 </div>
                                 <div className="relative">
@@ -860,38 +920,6 @@ const PatientDashboard = () => {
                                             <p className="mt-2 text-sm text-slate-500">{item.description}</p>
                                         </article>
                                     ))}
-                                </div>
-                            </div>
-
-                            <div className="border-y border-slate-200 bg-slate-50">
-                                <div className="mx-auto w-full max-w-[1240px] px-4 py-7 sm:px-8 sm:py-8">
-                                    <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
-                                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                                            <div className="text-center sm:text-left">
-                                                <p className="text-3xl font-black text-primary">{doctors.length}+</p>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Doctors</p>
-                                            </div>
-                                            <div className="text-center sm:text-left">
-                                                <p className="text-3xl font-black text-primary">{clinics.length}+</p>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Clinics</p>
-                                            </div>
-                                            <div className="text-center sm:text-left">
-                                                <p className="text-3xl font-black text-primary">{bookings.length > 0 ? '4.9/5' : '--'}</p>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Avg Rating</p>
-                                            </div>
-                                            <div className="text-center sm:text-left">
-                                                <p className="text-3xl font-black text-primary">{bookings.length}+</p>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Weekly Slots</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={moveToDoctors}
-                                            className="w-full rounded-xl bg-slate-900 px-6 py-3 text-sm font-black text-white hover:bg-slate-800 sm:w-auto"
-                                        >
-                                            Start Your Journey
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
 

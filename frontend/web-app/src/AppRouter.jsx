@@ -13,6 +13,8 @@ import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
 import ClinicManagement from './pages/ClinicManagement';
 import SpecialtyManagement from './pages/SpecialtyManagement';
+import PatientAiTriage from './pages/PatientAiTriage';
+import PatientPaymentStatus from './pages/PatientPaymentStatus';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -53,6 +55,8 @@ const AppRouter = () => {
                 {/* Patient Routes */}
                 <Route path="/patient" element={<ProtectedRoute allowedRoles={['R3']} />}>
                     <Route index element={<PatientDashboard />} />
+                    <Route path="ai" element={<PatientAiTriage />} />
+                    <Route path="bookings/:bookingId/payment" element={<PatientPaymentStatus />} />
                     <Route path="clinics" element={<ClinicDirectory />} />
                     <Route path="clinics/:id" element={<ClinicDetail />} />
                     <Route path="doctor/:id" element={<DoctorDetail />} />

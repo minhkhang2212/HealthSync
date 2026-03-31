@@ -287,8 +287,8 @@ class BookingController extends Controller
 
         return [
             'mode' => 'payment',
-            'success_url' => "{$frontendUrl}/patient/doctors/{$doctorId}?checkout=success&booking={$bookingId}&session_id={CHECKOUT_SESSION_ID}",
-            'cancel_url' => "{$frontendUrl}/patient/doctors/{$doctorId}?checkout=cancelled&booking={$bookingId}",
+            'success_url' => "{$frontendUrl}/patient/bookings/{$bookingId}/payment?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+            'cancel_url' => "{$frontendUrl}/patient/bookings/{$bookingId}/payment?checkout=cancelled",
             'customer_email' => $customerEmail,
             'client_reference_id' => (string) $bookingId,
             'payment_method_types[0]' => 'card',

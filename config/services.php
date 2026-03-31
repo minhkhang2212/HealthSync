@@ -45,4 +45,13 @@ return [
         'webhook_tolerance' => (int) env('STRIPE_WEBHOOK_TOLERANCE', 300),
     ],
 
+    'ai_triage' => [
+        'enabled' => filter_var(env('AI_TRIAGE_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'provider' => env('AI_TRIAGE_PROVIDER', 'openai'),
+        'base_url' => env('AI_TRIAGE_BASE_URL', 'https://api.openai.com/v1'),
+        'api_key' => env('AI_TRIAGE_API_KEY', env('OPENAI_API_KEY')),
+        'model' => env('AI_TRIAGE_MODEL', 'gpt-4.1-mini'),
+        'timeout' => (int) env('AI_TRIAGE_TIMEOUT', 25),
+    ],
+
 ];

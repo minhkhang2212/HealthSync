@@ -171,6 +171,7 @@ const DoctorDetail = () => {
     const { user } = useSelector((state) => state.auth);
     const { selectedDoctor, availability, loading, error } = useSelector((state) => state.doctor);
     const { loading: bookingLoading, error: bookingError } = useSelector((state) => state.booking);
+    const aiPrefill = React.useMemo(() => location.state?.aiPrefill || null, [location.state]);
 
     const [selectedDate, setSelectedDate] = React.useState('');
     const [selectedTime, setSelectedTime] = React.useState('');
@@ -182,16 +183,22 @@ const DoctorDetail = () => {
     const [fieldErrors, setFieldErrors] = React.useState({});
     const [bookingForm, setBookingForm] = React.useState(DEFAULT_BOOKING_FORM);
     const handledCheckoutEventRef = React.useRef('');
+    const aiPrefillAppliedRef = React.useRef(false);
 
     const apiAssetBase = React.useMemo(() => getApiAssetBase(), []);
 
     React.useEffect(() => {
         if (!id) return;
 
+        aiPrefillAppliedRef.current = false;
         dispatch(clearBookingError());
         dispatch(fetchDoctorById(id));
         dispatch(fetchDoctorAvailability({ id }));
     }, [dispatch, id]);
+
+    React.useEffect(() => {
+        aiPrefillAppliedRef.current = false;
+    }, [aiPrefill?.date, aiPrefill?.timeType, aiPrefill?.doctorId]);
 
     React.useEffect(() => {
         let cancelled = false;
@@ -267,6 +274,42 @@ const DoctorDetail = () => {
             return exists ? previous : '';
         });
     }, [availability, selectedDate]);
+
+    React.useEffect(() => {
+        if (!aiPrefill || aiPrefillAppliedRef.current || Number(aiPrefill.doctorId) !== Number(id) || availability.length === 0) {
+            return;
+        }
+
+        const matchedSlot = availability.find(
+            (slot) => slot.date === aiPrefill.date && slot.timeType === aiPrefill.timeType
+        );
+
+        aiPrefillAppliedRef.current = true;
+
+        if (!matchedSlot) {
+            return;
+        }
+
+        setSelectedDate(aiPrefill.date);
+        setSelectedTime(aiPrefill.timeType);
+    }, [aiPrefill, availability, id]);
+
+    React.useEffect(() => {
+        if (!aiPrefill || Number(aiPrefill.doctorId) !== Number(id) || !aiPrefill.reasonForVisit) {
+            return;
+        }
+
+        setBookingForm((previous) => {
+            if (previous.reasonForVisit) {
+                return previous;
+            }
+
+            return {
+                ...previous,
+                reasonForVisit: aiPrefill.reasonForVisit,
+            };
+        });
+    }, [aiPrefill, id]);
 
     React.useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -401,6 +444,7 @@ const DoctorDetail = () => {
             patientName: previous.patientName || user?.name || '',
             patientPhoneNumber: previous.patientPhoneNumber || user?.phoneNumber || '',
             patientGender: user?.gender || previous.patientGender || 'M',
+            reasonForVisit: previous.reasonForVisit || aiPrefill?.reasonForVisit || '',
             paymentMethod: paymentAvailability[previous.paymentMethod]
                 ? previous.paymentMethod
                 : resolvePreferredPaymentMethod(paymentAvailability),
