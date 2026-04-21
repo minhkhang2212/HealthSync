@@ -1,9 +1,14 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { logoutUser } from '../store/slices/authSlice';
+import { resetAiSession } from '../store/slices/aiSlice';
 import { fetchClinics } from '../store/slices/clinicSlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
 import { getApiAssetBase } from '../utils/apiClient';
+import PatientPortalFooter from '../components/layout/PatientPortalFooter';
+import PatientPortalHeader from '../components/layout/PatientPortalHeader';
+import { PATIENT_PORTAL_ROUTE_TARGETS } from '../components/layout/patientPortalConfig';
 
 const normalizeId = (value) => (value == null ? '' : String(value));
 
@@ -12,15 +17,6 @@ const normalizeSearchText = (value) =>
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase();
-
-const extractInitials = (name) =>
-    String(name || '')
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join('')
-        .toUpperCase() || 'PT';
 
 const resolveImageSource = (value, apiAssetBase) => {
     if (!value || typeof value !== 'string') return null;
@@ -116,16 +112,6 @@ const ClinicDirectory = () => {
         return meta;
     }, [clinics, doctors]);
 
-    const totalSpecialties = React.useMemo(() => {
-        const specialtyIds = new Set();
-        for (const item of clinicMeta.values()) {
-            for (const specialtyId of item.specialties.keys()) {
-                specialtyIds.add(specialtyId);
-            }
-        }
-        return specialtyIds.size;
-    }, [clinicMeta]);
-
     const orderedClinics = React.useMemo(() => {
         const items = [...clinics];
         return items.sort((left, right) => {
@@ -149,159 +135,39 @@ const ClinicDirectory = () => {
         });
     }, [clinicMeta, orderedClinics, search]);
 
-    const featuredClinic = filteredClinics[0] || orderedClinics[0] || null;
-    const featuredClinicMeta = featuredClinic ? clinicMeta.get(normalizeId(featuredClinic.id)) : null;
-    const featuredClinicImage = resolveImageSource(featuredClinic?.image, apiAssetBase);
     const loading = clinicsLoading || doctorsLoading;
     const error = clinicsError || doctorsError;
+    const navigateToDashboardTarget = (portalTarget) => {
+        navigate('/patient', { state: { portalTarget } });
+    };
+
+    const handleLogout = async () => {
+        dispatch(resetAiSession());
+        await dispatch(logoutUser());
+        navigate('/login');
+    };
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900">
-            <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-8 lg:px-10">
-                    <Link to="/patient" className="flex items-center gap-3">
-                        <div className="grid size-10 place-items-center rounded-xl bg-primary text-white shadow-lg shadow-blue-200/70">
-                            <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                        </div>
-                        <div>
-                            <p className="text-lg font-black tracking-tight">HealthSync</p>
-                            <p className="text-xs text-slate-500">Patient Portal</p>
-                        </div>
-                    </Link>
+            <PatientPortalHeader
+                user={user}
+                activeItem="clinics"
+                onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                onFindDoctors={() => navigate('/patient/doctors')}
+                onClinics={() => navigate('/patient/clinics')}
+                onAiSupport={() => navigate('/patient/ai')}
+                onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                onLogout={handleLogout}
+            />
 
-                    <nav className="hidden items-center gap-2 md:flex">
-                        <button
-                            type="button"
-                            onClick={() => navigate('/patient')}
-                            className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                        >
-                            Dashboard
-                        </button>
-                        <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-black text-primary">Clinics</div>
-                    </nav>
-
-                    <div className="flex items-center gap-3">
-                        <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 sm:flex">
-                            <div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-black text-white">
-                                {extractInitials(user?.name)}
-                            </div>
-                            <span className="max-w-[180px] truncate text-sm font-semibold text-slate-700">{user?.name}</span>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => navigate('/patient')}
-                            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                            Back to Dashboard
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 lg:px-10">
+            <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
                 <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                     <Link to="/patient" className="font-medium hover:text-primary">Home</Link>
                     <span className="material-symbols-outlined text-base text-slate-300">chevron_right</span>
                     <span className="font-semibold text-slate-900">Clinics</span>
                 </nav>
 
-                <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-                    <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
-                        <div className="p-6 sm:p-8 lg:p-10">
-                            <div className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-[0.2em] text-primary">
-                                Clinic Directory
-                            </div>
-                            <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">
-                                Explore clinics available in HealthSync
-                            </h1>
-                            <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-                                Browse current clinics, review addresses and specialties, then open a clinic page to see the doctors currently linked to it.
-                            </p>
-
-                            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                                <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Clinics</p>
-                                    <p className="mt-3 text-3xl font-black text-slate-900">{clinics.length}</p>
-                                    <p className="mt-2 text-sm text-slate-500">Currently visible in the patient catalog.</p>
-                                </article>
-                                <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Doctors</p>
-                                    <p className="mt-3 text-3xl font-black text-slate-900">{doctors.length}</p>
-                                    <p className="mt-2 text-sm text-slate-500">Doctors linked to clinics and ready to browse.</p>
-                                </article>
-                                <article className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Specialties</p>
-                                    <p className="mt-3 text-3xl font-black text-slate-900">{totalSpecialties}</p>
-                                    <p className="mt-2 text-sm text-slate-500">Distinct specialty areas represented across clinics.</p>
-                                </article>
-                            </div>
-
-                            <div className="mt-8 flex flex-wrap gap-3">
-                                <Link
-                                    to="/patient"
-                                    className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
-                                >
-                                    Back to Dashboard
-                                </Link>
-                            </div>
-                        </div>
-
-                        <div className="relative min-h-[340px] border-t border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.16),_transparent_34%),linear-gradient(135deg,_#eff6ff,_#f8fafc_58%,_#ffffff)] lg:min-h-full lg:border-l lg:border-t-0">
-                            {featuredClinic ? (
-                                <div className="flex h-full flex-col p-6 sm:p-8">
-                                    <div className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white shadow-lg shadow-blue-100/50">
-                                        {featuredClinicImage ? (
-                                            <img
-                                                src={featuredClinicImage}
-                                                alt={featuredClinic.name}
-                                                className="h-56 w-full object-cover sm:h-72"
-                                            />
-                                        ) : (
-                                            <div className="grid h-56 w-full place-items-center bg-slate-100 sm:h-72">
-                                                <span className="material-symbols-outlined text-7xl text-slate-400">apartment</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="mt-5 rounded-[1.75rem] border border-white/80 bg-white/90 p-5 shadow-sm">
-                                        <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Featured Clinic</p>
-                                        <h2 className="mt-3 text-2xl font-black tracking-tight text-slate-900">{featuredClinic.name}</h2>
-                                        <p className="mt-2 flex items-start gap-2 text-sm text-slate-500">
-                                            <span className="material-symbols-outlined text-[18px] text-primary">location_on</span>
-                                            <span>{featuredClinic.address || 'Address currently unavailable'}</span>
-                                        </p>
-                                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                                                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Doctors</p>
-                                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                                    {featuredClinicMeta?.doctorIds.size || 0}
-                                                </p>
-                                            </div>
-                                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
-                                                <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Specialties</p>
-                                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                                    {featuredClinicMeta?.specialties.size || 0}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Link
-                                            to={`/patient/clinics/${featuredClinic.id}`}
-                                            className="mt-5 inline-flex rounded-xl bg-primary px-5 py-3 text-sm font-black text-white hover:bg-primary/90"
-                                        >
-                                            Open Clinic Page
-                                        </Link>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="grid h-full min-h-[340px] place-items-center p-8 text-center text-slate-500">
-                                    Clinic data will appear here once available.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </section>
-
-                <section className="mt-8 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 className="text-2xl font-black tracking-tight text-slate-900">All Clinics</h2>
@@ -419,6 +285,10 @@ const ClinicDirectory = () => {
                     )}
                 </section>
             </main>
+
+            <section className="w-full bg-white">
+                <PatientPortalFooter />
+            </section>
         </div>
     );
 };

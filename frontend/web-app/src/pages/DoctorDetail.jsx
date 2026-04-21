@@ -1,9 +1,14 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { logoutUser } from '../store/slices/authSlice';
 import { cancelBooking as cancelPatientBooking, clearError as clearBookingError, createBooking } from '../store/slices/bookingSlice';
 import BookingRequestModal from '../components/booking/BookingRequestModal';
 import { fetchDoctorAvailability, fetchDoctorById } from '../store/slices/doctorSlice';
+import { resetAiSession } from '../store/slices/aiSlice';
+import PatientPortalFooter from '../components/layout/PatientPortalFooter';
+import PatientPortalHeader from '../components/layout/PatientPortalHeader';
+import { PATIENT_PORTAL_ROUTE_TARGETS } from '../components/layout/patientPortalConfig';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 import { compareTimeType, DEFAULT_TIME_LABELS } from '../utils/timeSlots';
@@ -434,6 +439,16 @@ const DoctorDetail = () => {
         });
     }, [paymentAvailability]);
 
+    const navigateToDashboardTarget = React.useCallback((portalTarget) => {
+        navigate('/patient', { state: { portalTarget } });
+    }, [navigate]);
+
+    const handleLogout = React.useCallback(async () => {
+        dispatch(resetAiSession());
+        await dispatch(logoutUser());
+        navigate('/login');
+    }, [dispatch, navigate]);
+
     const openBookingModal = () => {
         dispatch(clearBookingError());
         setFieldErrors({});
@@ -533,30 +548,75 @@ const DoctorDetail = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white p-8 text-center text-slate-500">
-                    Loading doctor profile...
-                </div>
+            <div className="min-h-screen bg-slate-100 text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="doctors"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+                        Loading doctor profile...
+                    </div>
+                </main>
+                <section className="bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-6xl rounded-[28px] border border-red-200 bg-white p-8 text-center text-red-700">
-                    {error}
-                </div>
+            <div className="min-h-screen bg-slate-100 text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="doctors"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="rounded-[28px] border border-red-200 bg-white p-8 text-center text-red-700 shadow-sm">
+                        {error}
+                    </div>
+                </main>
+                <section className="bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
 
     if (!selectedDoctor) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white p-8 text-center text-slate-500">
-                    Doctor not found.
-                </div>
+            <div className="min-h-screen bg-slate-100 text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="doctors"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+                        Doctor not found.
+                    </div>
+                </main>
+                <section className="bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
@@ -564,37 +624,18 @@ const DoctorDetail = () => {
     return (
         <>
             <div className="min-h-screen bg-slate-100 text-slate-900">
-                <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-                    <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-8 lg:px-10">
-                        <Link to="/patient" className="flex items-center gap-3">
-                            <div className="grid size-10 place-items-center rounded-xl bg-primary text-white shadow-lg shadow-blue-200/70">
-                                <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                            </div>
-                            <div>
-                                <p className="text-lg font-black tracking-tight">HealthSync</p>
-                                <p className="text-xs text-slate-500">Patient Portal</p>
-                            </div>
-                        </Link>
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="doctors"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
 
-                        <div className="flex items-center gap-3">
-                            <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 sm:flex">
-                                <div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-black text-white">
-                                    {extractInitials(user?.name)}
-                                </div>
-                                <span className="max-w-[180px] truncate text-sm font-semibold text-slate-700">{user?.name}</span>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => navigate('/patient')}
-                                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                            >
-                                Back to Dashboard
-                            </button>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 lg:px-10">
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-8 lg:px-10">
                     <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                         <Link to="/patient" className="font-medium hover:text-primary">Home</Link>
                         <span className="material-symbols-outlined text-base text-slate-300">chevron_right</span>
@@ -854,6 +895,10 @@ const DoctorDetail = () => {
                         </aside>
                     </div>
                 </main>
+
+                <section className="bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
 
             <BookingRequestModal

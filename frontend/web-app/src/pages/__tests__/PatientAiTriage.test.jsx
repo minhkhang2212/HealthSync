@@ -6,7 +6,7 @@ import PatientAiTriage from '../PatientAiTriage';
 import { renderWithProviders } from '../../utils/test-utils';
 
 describe('PatientAiTriage', () => {
-    it('renders the dedicated AI workspace and routes recommendations back to the dashboard', async () => {
+    it('renders the dedicated AI workspace and routes recommendations to the doctor directory', async () => {
         window.history.replaceState(null, '', '/patient/ai');
 
         renderWithProviders(<PatientAiTriage />, {
@@ -67,7 +67,7 @@ describe('PatientAiTriage', () => {
 
         await userEvent.click(screen.getByRole('button', { name: /View All Specialists/i }));
 
-        expect(window.location.pathname).toBe('/patient');
+        expect(window.location.pathname).toBe('/patient/doctors');
         expect(window.history.state.usr.aiPrefill.specialtyName).toBe('Cardiology');
     });
 

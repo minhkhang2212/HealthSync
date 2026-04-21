@@ -278,6 +278,102 @@ patient1@healthsync.com
 patient2@healthsync.com
 ```
 
+### Android Emulator Demo (localhost)
+
+For supervisor demos, the quickest way to show real mobile interaction is `Android Studio Emulator + adb reverse`.
+
+Why this setup is the default recommendation:
+
+- Frontend API calls default to `http://localhost:8000/api` in [frontend/web-app/src/utils/apiClient.js](/d:/xampp_new/htdocs/healthsync/frontend/web-app/src/utils/apiClient.js:1)
+- Backend CORS currently allows `localhost` and `127.0.0.1` origins in [config/cors.php](/d:/xampp_new/htdocs/healthsync/config/cors.php:1)
+- Opening the site as `http://10.0.2.2:5173` can render the UI, but API requests may fail because the browser origin changes to `10.0.2.2`
+
+Recommended local demo flow:
+
+```text
+1. Start an Android emulator in Android Studio Device Manager
+2. Run Laravel backend on 127.0.0.1:8000
+3. Run React/Vite frontend on 127.0.0.1:5173
+4. Reverse both ports through adb
+5. Open http://localhost:5173 inside emulator Chrome
+```
+
+Backend:
+
+```powershell
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+Frontend:
+
+```powershell
+cd frontend/web-app
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+ADB reverse options:
+
+Manual:
+
+```powershell
+adb devices
+adb reverse tcp:5173 tcp:5173
+adb reverse tcp:8000 tcp:8000
+```
+
+Repo helper script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-android-emulator-demo.ps1
+```
+
+If you want to clear stale reverse rules first:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-android-emulator-demo.ps1 -ResetExisting
+```
+
+If `adb` is not on `PATH`, the helper script also checks common Android SDK locations. You can still pass it explicitly:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-android-emulator-demo.ps1 -AdbPath "C:\Users\<your-user>\AppData\Local\Android\Sdk\platform-tools\adb.exe"
+```
+
+Inside emulator Chrome, open:
+
+```text
+http://localhost:5173
+```
+
+Suggested demo account:
+
+```text
+patient1@healthsync.com
+password123
+```
+
+Supervisor smoke-check scenario:
+
+- Log in and open the patient dashboard
+- Switch emulator sizes or rotate portrait/landscape
+- Check Dashboard, Clinics, Symptom Checker / AI page, login, menus, and forms
+- Confirm real interaction works: scroll, input, routing, API loading, and no CORS/network errors
+
+Fallback:
+
+```powershell
+adb reverse --remove-all
+adb reverse tcp:5173 tcp:5173
+adb reverse tcp:8000 tcp:8000
+```
+
+If the emulator still cannot load the app, verify:
+
+- backend is still running on `127.0.0.1:8000`
+- frontend is still running on `127.0.0.1:5173`
+- `adb devices` shows the emulator in `device` state
+
 ---
 
 ## 10. Main Tables

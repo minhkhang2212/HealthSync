@@ -1,8 +1,13 @@
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutUser } from '../store/slices/authSlice';
+import { resetAiSession } from '../store/slices/aiSlice';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
+import PatientPortalFooter from '../components/layout/PatientPortalFooter';
+import PatientPortalHeader from '../components/layout/PatientPortalHeader';
+import { PATIENT_PORTAL_ROUTE_TARGETS } from '../components/layout/patientPortalConfig';
 
 const POSITION_LABELS = {
     P0: 'Doctor',
@@ -13,15 +18,6 @@ const POSITION_LABELS = {
 };
 
 const normalizeId = (value) => (value == null ? '' : String(value));
-
-const extractInitials = (name) =>
-    String(name || '')
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join('')
-        .toUpperCase() || 'PT';
 
 const resolveImageSource = (value, apiAssetBase) => {
     if (!value || typeof value !== 'string') return null;
@@ -96,6 +92,7 @@ const loadAllcodeMap = async (type) => {
 const ClinicDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
 
     const [clinic, setClinic] = React.useState(null);
@@ -227,87 +224,95 @@ const ClinicDetail = () => {
     const specialtySummary =
         specialties.length > 0 ? specialties.map((specialty) => specialty.name).join(', ') : 'Specialty information unavailable';
 
+    const navigateToDashboardTarget = (portalTarget) => {
+        navigate('/patient', { state: { portalTarget } });
+    };
+
+    const handleLogout = async () => {
+        dispatch(resetAiSession());
+        await dispatch(logoutUser());
+        navigate('/login');
+    };
+
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-7xl rounded-[28px] border border-slate-200 bg-white p-8 text-center text-slate-500">
-                    Loading clinic page...
-                </div>
+            <div className="min-h-screen bg-[#f4f6f8] text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="clinics"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+                        Loading clinic page...
+                    </div>
+                </main>
+                <section className="w-full bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
 
     if (error || !clinic) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-6xl space-y-4 rounded-[28px] border border-red-200 bg-white p-8 text-center">
-                    <p className="text-lg font-black text-slate-900">Clinic not available</p>
-                    <p className="text-sm text-red-700">{error || 'The requested clinic could not be found.'}</p>
-                    <div className="flex justify-center gap-3">
-                        <Link
-                            to="/patient/clinics"
-                            className="inline-flex rounded-xl border border-primary px-5 py-2 text-sm font-black text-primary hover:bg-blue-50"
-                        >
-                            Back to Clinics
-                        </Link>
-                        <Link
-                            to="/patient"
-                            className="inline-flex rounded-xl border border-slate-300 px-5 py-2 text-sm font-black text-slate-700 hover:bg-slate-50"
-                        >
-                            Dashboard
-                        </Link>
+            <div className="min-h-screen bg-[#f4f6f8] text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="clinics"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="space-y-4 rounded-[28px] border border-red-200 bg-white p-8 text-center shadow-sm">
+                        <p className="text-lg font-black text-slate-900">Clinic not available</p>
+                        <p className="text-sm text-red-700">{error || 'The requested clinic could not be found.'}</p>
+                        <div className="flex justify-center gap-3">
+                            <Link
+                                to="/patient/clinics"
+                                className="inline-flex rounded-xl border border-primary px-5 py-2 text-sm font-black text-primary hover:bg-blue-50"
+                            >
+                                Back to Clinics
+                            </Link>
+                            <Link
+                                to="/patient"
+                                className="inline-flex rounded-xl border border-slate-300 px-5 py-2 text-sm font-black text-slate-700 hover:bg-slate-50"
+                            >
+                                Dashboard
+                            </Link>
+                        </div>
                     </div>
-                </div>
+                </main>
+                <section className="w-full bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
 
     return (
         <div className="min-h-screen bg-[#f4f6f8] text-slate-900">
-            <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/92 backdrop-blur-sm">
-                <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-                    <Link to="/patient" className="flex items-center gap-3">
-                        <div className="grid size-10 place-items-center rounded-xl bg-primary text-white">
-                            <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                        </div>
-                        <div>
-                            <p className="text-lg font-black tracking-tight">HealthSync</p>
-                            <p className="text-xs text-slate-500">Clinic Discovery</p>
-                        </div>
-                    </Link>
+            <PatientPortalHeader
+                user={user}
+                activeItem="clinics"
+                onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                onFindDoctors={() => navigate('/patient/doctors')}
+                onClinics={() => navigate('/patient/clinics')}
+                onAiSupport={() => navigate('/patient/ai')}
+                onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                onLogout={handleLogout}
+            />
 
-                    <nav className="hidden items-center gap-8 md:flex">
-                        <button type="button" onClick={() => navigate('/patient')} className="text-sm font-medium text-slate-700 hover:text-primary">
-                            Find Doctors
-                        </button>
-                        <Link to="/patient/clinics" className="text-sm font-semibold text-primary">
-                            Clinics
-                        </Link>
-                        <button type="button" onClick={() => navigate('/patient')} className="text-sm font-medium text-slate-700 hover:text-primary">
-                            How It Works
-                        </button>
-                    </nav>
-
-                    <div className="flex items-center gap-3">
-                        <button type="button" className="grid size-10 place-items-center rounded-full bg-slate-100 text-slate-500">
-                            <span className="material-symbols-outlined text-[20px]">notifications</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => navigate('/patient/clinics')}
-                            className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm"
-                        >
-                            <div className="grid size-9 place-items-center rounded-full bg-amber-100 text-xs font-black text-amber-700">
-                                {extractInitials(user?.name)}
-                            </div>
-                            <span className="hidden max-w-[150px] truncate text-sm font-semibold text-slate-700 sm:inline">{user?.name}</span>
-                            <span className="material-symbols-outlined text-[18px] text-slate-400">expand_more</span>
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+            <main className="mx-auto w-full max-w-[1240px] px-4 py-5 sm:px-8 lg:px-8">
                 <nav className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                     <Link to="/patient" className="hover:text-primary">Home</Link>
                     <span className="material-symbols-outlined text-[18px] text-slate-300">chevron_right</span>
@@ -533,6 +538,10 @@ const ClinicDetail = () => {
                     </aside>
                 </div>
             </main>
+
+            <section className="w-full bg-white">
+                <PatientPortalFooter />
+            </section>
         </div>
     );
 };

@@ -1,7 +1,12 @@
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutUser } from '../store/slices/authSlice';
+import { resetAiSession } from '../store/slices/aiSlice';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
+import PatientPortalFooter from '../components/layout/PatientPortalFooter';
+import PatientPortalHeader from '../components/layout/PatientPortalHeader';
+import { PATIENT_PORTAL_ROUTE_TARGETS } from '../components/layout/patientPortalConfig';
 
 const POSITION_LABELS = {
     P0: 'Doctor',
@@ -93,6 +98,7 @@ const resolveDoctorMapping = (doctor, specialtyId) => {
 const SpecialtyDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
 
     const [specialty, setSpecialty] = React.useState(null);
@@ -165,58 +171,84 @@ const SpecialtyDetail = () => {
         return uniqueClinics.size;
     }, [doctors, id]);
 
+    const navigateToDashboardTarget = (portalTarget) => {
+        navigate('/patient', { state: { portalTarget } });
+    };
+
+    const handleLogout = async () => {
+        dispatch(resetAiSession());
+        await dispatch(logoutUser());
+        navigate('/login');
+    };
+
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-500">
-                    Loading specialty page...
-                </div>
+            <div className="min-h-screen bg-slate-100 text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="doctors"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
+                        Loading specialty page...
+                    </div>
+                </main>
+                <section className="bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
 
     if (error || !specialty) {
         return (
-            <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-900 sm:px-8">
-                <div className="mx-auto max-w-5xl space-y-4 rounded-3xl border border-red-200 bg-white p-8 text-center">
-                    <p className="text-lg font-black text-slate-900">Specialty not available</p>
-                    <p className="text-sm text-red-700">{error || 'The requested specialty could not be found.'}</p>
-                    <Link to="/patient" className="inline-flex rounded-xl border border-primary px-5 py-2 text-sm font-black text-primary hover:bg-blue-50">
-                        Back to Dashboard
-                    </Link>
-                </div>
+            <div className="min-h-screen bg-slate-100 text-slate-900">
+                <PatientPortalHeader
+                    user={user}
+                    activeItem="doctors"
+                    onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                    onFindDoctors={() => navigate('/patient/doctors')}
+                    onClinics={() => navigate('/patient/clinics')}
+                    onAiSupport={() => navigate('/patient/ai')}
+                    onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                    onLogout={handleLogout}
+                />
+                <main className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                    <div className="space-y-4 rounded-3xl border border-red-200 bg-white p-8 text-center shadow-sm">
+                        <p className="text-lg font-black text-slate-900">Specialty not available</p>
+                        <p className="text-sm text-red-700">{error || 'The requested specialty could not be found.'}</p>
+                        <Link to="/patient" className="inline-flex rounded-xl border border-primary px-5 py-2 text-sm font-black text-primary hover:bg-blue-50">
+                            Back to Dashboard
+                        </Link>
+                    </div>
+                </main>
+                <section className="bg-white">
+                    <PatientPortalFooter />
+                </section>
             </div>
         );
     }
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900">
-            <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-                <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8">
-                    <Link to="/patient" className="flex items-center gap-3">
-                        <div className="grid size-9 place-items-center rounded-lg bg-primary text-white">
-                            <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                        </div>
-                        <div>
-                            <p className="font-black">HealthSync</p>
-                            <p className="text-xs text-slate-500">Patient Portal</p>
-                        </div>
-                    </Link>
+            <PatientPortalHeader
+                user={user}
+                activeItem="doctors"
+                onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                onFindDoctors={() => navigate('/patient/doctors')}
+                onClinics={() => navigate('/patient/clinics')}
+                onAiSupport={() => navigate('/patient/ai')}
+                onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                onLogout={handleLogout}
+            />
 
-                    <div className="flex items-center gap-3">
-                        <span className="hidden text-sm font-semibold text-slate-600 sm:inline">{user?.name}</span>
-                        <button
-                            type="button"
-                            onClick={() => navigate('/patient')}
-                            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                            Back to Dashboard
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-8">
+            <main className="mx-auto flex w-full max-w-[1240px] flex-col gap-8 px-4 py-8 sm:px-8">
                 <nav className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-slate-400">
                     <Link to="/patient" className="hover:text-primary">Home</Link>
                     <span className="material-symbols-outlined text-sm">chevron_right</span>
@@ -299,7 +331,7 @@ const SpecialtyDetail = () => {
                             <p className="text-sm text-slate-500">Browse doctors currently assigned to this specialty.</p>
                         </div>
                         <Link
-                            to="/patient"
+                            to="/patient/doctors"
                             className="rounded-xl border border-primary px-4 py-2 text-sm font-black text-primary hover:bg-blue-50"
                         >
                             Browse All Doctors
@@ -382,6 +414,10 @@ const SpecialtyDetail = () => {
                     )}
                 </section>
             </main>
+
+            <section className="bg-white">
+                <PatientPortalFooter />
+            </section>
         </div>
     );
 };

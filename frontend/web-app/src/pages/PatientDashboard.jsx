@@ -15,6 +15,10 @@ import { DEFAULT_TIME_LABELS } from '../utils/timeSlots';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
 import { BsCheckCircleFill } from 'react-icons/bs';
+import PatientPortalFooter from '../components/layout/PatientPortalFooter';
+import PatientPortalHeader from '../components/layout/PatientPortalHeader';
+import { PATIENT_PORTAL_ROUTE_TARGETS } from '../components/layout/patientPortalConfig';
+import PatientDirectorySearchBar from '../components/discover/PatientDirectorySearchBar';
 import 'swiper/css';
 import 'swiper/css/navigation';
 
@@ -110,13 +114,6 @@ const normalizeSearchText = (value) =>
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase();
 
-const buildAiDashboardFilters = (prefill) => ({
-    search: prefill?.specialtyName || '',
-    location: prefill?.locationQuery || '',
-    specialtyId: prefill?.specialtyId ? String(prefill.specialtyId) : '',
-    clinicId: '',
-});
-
 const resolveSpecialtyVisual = (specialty) => {
     const searchText = normalizeSearchText(specialty?.name);
     const matched = SPECIALTY_VISUALS.find((item) => item.keywords.some((keyword) => searchText.includes(keyword)));
@@ -135,8 +132,8 @@ const resolveSpecialtyVisual = (specialty) => {
 const HOW_IT_WORKS_STEPS = [
     {
         icon: 'search',
-        title: '1. Search & Filter',
-        description: 'Search by specialty, location, or clinic name. Use filters to quickly find the right doctor.',
+        title: '1. Explore Directory',
+        description: 'Open the discovery directory to browse specialties, clinics, and doctors from one place.',
     },
     {
         icon: 'calendar_month',
@@ -147,21 +144,6 @@ const HOW_IT_WORKS_STEPS = [
         icon: 'verified_user',
         title: '3. Secure Booking',
         description: 'Confirm your booking instantly and receive reminders for upcoming appointments.',
-    },
-];
-
-const FOOTER_COLUMNS = [
-    {
-        title: 'For Patients',
-        links: ['Find a Specialist', 'Symptom Checker', 'Health Records', 'Patient Stories'],
-    },
-    {
-        title: 'For Clinics',
-        links: ['Join as a Clinic', 'Practice Software', 'Appointments API', 'Resources'],
-    },
-    {
-        title: 'Support',
-        links: ['Help Center', 'Privacy Policy', 'Contact Us', 'Accessibility'],
     },
 ];
 
@@ -231,7 +213,6 @@ const PatientDashboard = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const doctorsRef = React.useRef(null);
-    const howItWorksRef = React.useRef(null);
 
     const { user } = useSelector((state) => state.auth);
     const { specialties, loading: loadingSpecialties, error: specialtyError } = useSelector((state) => state.specialty);
@@ -240,14 +221,10 @@ const PatientDashboard = () => {
     const { bookings, loading: loadingBookings, error: bookingError } = useSelector((state) => state.booking);
 
     const [view, setView] = React.useState('dashboard');
-    const [menuOpen, setMenuOpen] = React.useState(false);
     const [actionLoadingId, setActionLoadingId] = React.useState(null);
-    const [filters, setFilters] = React.useState({ search: '', location: '', specialtyId: '', clinicId: '' });
-    const [appliedFilters, setAppliedFilters] = React.useState({ search: '', location: '', specialtyId: '', clinicId: '' });
     const [statusLabels, setStatusLabels] = React.useState(DEFAULT_STATUS_LABELS);
     const [timeLabels, setTimeLabels] = React.useState(DEFAULT_TIME_LABELS);
     const [showAllSpecialties, setShowAllSpecialties] = React.useState(false);
-    const [showAllDoctors, setShowAllDoctors] = React.useState(false);
 
     const apiAssetBase = React.useMemo(() => getApiAssetBase(), []);
 
@@ -314,33 +291,47 @@ const PatientDashboard = () => {
     }, []);
 
     React.useEffect(() => {
-        if (!menuOpen) return undefined;
-        const handleClickOutside = (event) => {
-            if (!event.target?.closest?.('[data-patient-menu]')) setMenuOpen(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [menuOpen]);
-
-    React.useEffect(() => {
+        const portalTarget = location.state?.portalTarget;
         const prefill = location.state?.aiPrefill;
-        if (!prefill) return;
+        if (!prefill && !portalTarget) return;
 
-        const nextFilters = buildAiDashboardFilters(prefill);
-        setView('dashboard');
-        setFilters(nextFilters);
-        setAppliedFilters(nextFilters);
-        setShowAllDoctors(false);
+        if (prefill) {
+            navigate('/patient/doctors', { replace: true, state: { aiPrefill: prefill } });
+            return undefined;
+        }
 
-        const scrollTimer = window.setTimeout(() => {
-            if (typeof doctorsRef.current?.scrollIntoView === 'function') {
-                doctorsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const timers = [];
+        const queueAction = (callback) => {
+            const timerId = window.setTimeout(callback, 40);
+            timers.push(timerId);
+        };
+
+        if (portalTarget === PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS) {
+            setView('appointments');
+        } else {
+            setView('dashboard');
+            if (portalTarget === PATIENT_PORTAL_ROUTE_TARGETS.DOCTORS) {
+                queueAction(() => {
+                    if (typeof doctorsRef.current?.scrollIntoView === 'function') {
+                        doctorsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            } else {
+                queueAction(() => {
+                    try {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } catch {
+                        // Ignore environments without scroll support.
+                    }
+                });
             }
-        }, 40);
+        }
 
         navigate(location.pathname, { replace: true });
 
-        return () => window.clearTimeout(scrollTimer);
+        return () => {
+            timers.forEach((timerId) => window.clearTimeout(timerId));
+        };
     }, [location.pathname, location.state, navigate]);
 
     const doctorById = React.useMemo(() => {
@@ -388,47 +379,6 @@ const PatientDashboard = () => {
         [specialties, specialtyDoctorCount]
     );
 
-    const filteredDoctors = React.useMemo(() => {
-        const keyword = normalizeSearchText(appliedFilters.search).trim();
-        const locationKeyword = normalizeSearchText(appliedFilters.location).trim();
-        const specialtyId = normalizeId(appliedFilters.specialtyId);
-        const clinicId = normalizeId(appliedFilters.clinicId);
-        return doctors.filter((doctor) => {
-            const mappings = doctor.doctor_clinic_specialties || [];
-            if (specialtyId && !mappings.some((m) => normalizeId(m.specialtyId || m.specialty?.id) === specialtyId)) return false;
-            if (clinicId && !mappings.some((m) => normalizeId(m.clinicId || m.clinic?.id) === clinicId)) return false;
-            if (keyword) {
-                const text = normalizeSearchText(
-                    [
-                        doctor.name,
-                        doctor.email,
-                        ...mappings.map((m) => m.clinic?.name),
-                        ...mappings.map((m) => m.specialty?.name),
-                    ]
-                        .filter(Boolean)
-                        .join(' ')
-                );
-                if (!text.includes(keyword)) return false;
-            }
-
-            if (locationKeyword) {
-                const locationText = normalizeSearchText(
-                    [
-                        doctor.doctor_infor?.nameClinic,
-                        doctor.doctor_infor?.addressClinic,
-                        ...mappings.map((m) => m.clinic?.name),
-                        ...mappings.map((m) => m.clinic?.address),
-                    ]
-                        .filter(Boolean)
-                        .join(' ')
-                );
-                if (!locationText.includes(locationKeyword)) return false;
-            }
-
-            return true;
-        });
-    }, [appliedFilters, doctors]);
-
     const sortedBookings = React.useMemo(
         () => [...bookings].sort((a, b) => bookingSortValue(a) - bookingSortValue(b)),
         [bookings]
@@ -443,11 +393,9 @@ const PatientDashboard = () => {
             ),
         [clinics, clinicDoctorCount]
     );
+    const availableDoctors = React.useMemo(() => doctors, [doctors]);
     const topClinics = orderedClinics.slice(0, 3);
     const clinicCarouselItems = orderedClinics;
-    const currentYear = new Date().getFullYear();
-    const updatedDate = new Date().toLocaleDateString('en-GB');
-
     const moveToDoctors = () => {
         setView('dashboard');
         setTimeout(() => {
@@ -457,13 +405,8 @@ const PatientDashboard = () => {
         }, 40);
     };
 
-    const moveToHowItWorks = () => {
-        setView('dashboard');
-        setTimeout(() => {
-            if (typeof howItWorksRef.current?.scrollIntoView === 'function') {
-                howItWorksRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        }, 40);
+    const openDoctorDirectory = () => {
+        navigate('/patient/doctors');
     };
 
     const handleLogout = async () => {
@@ -477,13 +420,6 @@ const PatientDashboard = () => {
         const result = await dispatch(cancelBooking(id));
         setActionLoadingId(null);
         if (cancelBooking.fulfilled.match(result)) dispatch(fetchBookings());
-    };
-
-    const handleApplyFilters = (event) => {
-        event.preventDefault();
-        setAppliedFilters(filters);
-        setShowAllDoctors(false);
-        moveToDoctors();
     };
 
     const renderDoctorCard = (doctor, keyPrefix = 'doctor') => {
@@ -583,60 +519,15 @@ const PatientDashboard = () => {
 
     return (
         <div className="min-h-screen bg-slate-100 text-slate-900">
-            <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-                <div className="mx-auto flex w-full max-w-[1240px] items-center justify-between gap-3 px-4 py-3 sm:px-8">
-                    <div className="flex items-center gap-3">
-                        <div className="grid size-9 place-items-center rounded-lg bg-primary text-white">
-                            <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                        </div>
-                        <div>
-                            <p className="font-black">HealthSync</p>
-                            <p className="text-xs text-slate-500">Patient Portal</p>
-                        </div>
-                    </div>
-                    <nav className="hidden items-center gap-2 md:flex">
-                        <button onClick={moveToDoctors} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Find Doctors</button>
-                        <button onClick={() => navigate('/patient/clinics')} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Clinics</button>
-                        <button
-                            onClick={() => navigate('/patient/ai')}
-                            className="group inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary transition hover:bg-blue-50"
-                        >
-                            <span className="material-symbols-outlined text-[18px] text-amber-500 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12">auto_awesome</span>
-                            <span>AI Support</span>
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700 transition-transform duration-200 group-hover:scale-105">
-                                New
-                            </span>
-                        </button>
-                        <button onClick={moveToHowItWorks} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">How It Works</button>
-                        <button onClick={() => setView('appointments')} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">My Appointments</button>
-                    </nav>
-                    <div className="relative" data-patient-menu>
-                        <button onClick={() => setMenuOpen((prev) => !prev)} className="flex items-center gap-2 rounded-full border border-slate-200 px-3 py-2 text-sm">
-                            <span className="max-w-28 truncate font-semibold">{user?.name}</span>
-                            <span className="material-symbols-outlined text-[18px] text-slate-500">expand_more</span>
-                        </button>
-                        {menuOpen && (
-                            <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-md">
-                                <button onClick={() => { navigate('/patient/clinics'); setMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100">Clinics</button>
-                                <button
-                                    onClick={() => { navigate('/patient/ai'); setMenuOpen(false); }}
-                                    className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-primary transition hover:bg-blue-50"
-                                >
-                                    <span className="inline-flex items-center gap-2 font-semibold">
-                                        <span className="material-symbols-outlined text-[18px] text-amber-500 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-12">auto_awesome</span>
-                                        AI Support
-                                    </span>
-                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-700 transition-transform duration-200 group-hover:scale-105">
-                                        New
-                                    </span>
-                                </button>
-                                <button onClick={() => { setView('appointments'); setMenuOpen(false); }} className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100">My Appointments</button>
-                                <button onClick={handleLogout} className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">Logout</button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </header>
+            <PatientPortalHeader
+                user={user}
+                onHome={() => navigate('/patient', { state: { portalTarget: PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD } })}
+                onFindDoctors={() => openDoctorDirectory()}
+                onClinics={() => navigate('/patient/clinics')}
+                onAiSupport={() => navigate('/patient/ai')}
+                onAppointments={() => setView('appointments')}
+                onLogout={handleLogout}
+            />
 
             <main className={`w-full pb-0 ${view === 'dashboard' ? 'pt-0' : 'pt-6 sm:pt-8'}`}>
                 {view === 'dashboard' ? (
@@ -685,29 +576,13 @@ const PatientDashboard = () => {
                         </section>
 
                                 <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                            <form onSubmit={handleApplyFilters} className="grid gap-3 lg:grid-cols-[1.25fr_1fr_auto]">
-                                <div className="relative">
-                                    <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
-                                    <input
-                                        name="search"
-                                        value={filters.search}
-                                        onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-                                        placeholder="Specialty (e.g. Cardiology, GP)"
-                                        className="h-14 w-full rounded-xl border border-transparent bg-slate-100 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-primary focus:bg-white"
-                                    />
-                                </div>
-                                <div className="relative">
-                                    <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">location_on</span>
-                                    <input
-                                        name="location"
-                                        value={filters.location}
-                                        onChange={(event) => setFilters((prev) => ({ ...prev, location: event.target.value }))}
-                                        placeholder="City or Postcode"
-                                        className="h-14 w-full rounded-xl border border-transparent bg-slate-100 pl-11 pr-4 text-sm text-slate-700 outline-none transition focus:border-primary focus:bg-white"
-                                    />
-                                </div>
-                                <button type="submit" className="h-14 rounded-xl bg-primary px-8 text-sm font-black text-white shadow-sm transition hover:bg-blue-700">Find Appointments</button>
-                            </form>
+                            <PatientDirectorySearchBar
+                                mode="launcher"
+                                onLauncherClick={() => navigate('/patient/discover')}
+                                placeholder="Search specialty, doctor, or clinic..."
+                                actionLabel="Explore Directory"
+                                launcherAriaLabel="Open patient discover directory"
+                            />
                                 </section>
                             </div>
                         </section>
@@ -845,25 +720,21 @@ const PatientDashboard = () => {
                             <div className="flex items-end justify-between gap-3">
                                 <h2 className="text-2xl font-black">Available Doctors</h2>
                                 <div className="flex items-center gap-3">
-                                    <p className="text-xs font-semibold text-slate-500">{filteredDoctors.length} result(s)</p>
+                                    <p className="text-xs font-semibold text-slate-500">{availableDoctors.length} doctor(s)</p>
                                     <button
                                         type="button"
-                                        onClick={() => setShowAllDoctors((prev) => !prev)}
+                                        onClick={openDoctorDirectory}
                                         className="rounded-2xl bg-cyan-100 px-4 py-2 text-sm font-bold text-cyan-700 hover:bg-cyan-200"
                                     >
-                                        {showAllDoctors ? 'See less' : 'See more'}
+                                        See more
                                     </button>
                                 </div>
                             </div>
                             {doctorError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{doctorError}</div>}
                             {loadingDoctors ? (
                                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">Loading doctors...</div>
-                            ) : filteredDoctors.length === 0 ? (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">No doctors match your filters.</div>
-                            ) : showAllDoctors ? (
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                    {filteredDoctors.map((doctor) => renderDoctorCard(doctor, 'all-doctor'))}
-                                </div>
+                            ) : availableDoctors.length === 0 ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">No doctors available.</div>
                             ) : (
                                 <div className="relative px-10 py-2">
                                     <button
@@ -892,7 +763,7 @@ const PatientDashboard = () => {
                                             1200: { slidesPerView: 3 },
                                         }}
                                     >
-                                        {filteredDoctors.map((doctor) => (
+                                        {availableDoctors.map((doctor) => (
                                             <SwiperSlide key={doctor.id}>
                                                 {renderDoctorCard(doctor)}
                                             </SwiperSlide>
@@ -904,7 +775,7 @@ const PatientDashboard = () => {
                             </div>
                         </section>
 
-                        <section ref={howItWorksRef} className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-white">
+                        <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-white">
                             <div className="mx-auto w-full max-w-[1240px] px-4 py-14 sm:px-8 sm:py-16">
                                 <div className="text-center">
                                     <h2 className="text-3xl font-black text-slate-900">How it Works</h2>
@@ -923,41 +794,7 @@ const PatientDashboard = () => {
                                 </div>
                             </div>
 
-                            <footer className="mx-auto w-full max-w-[1240px] bg-white px-4 py-10 sm:px-8 sm:py-12">
-                                <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr]">
-                                    <div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="grid size-9 place-items-center rounded-lg bg-primary text-white">
-                                                <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                                            </div>
-                                            <div>
-                                                <p className="font-black">HealthSync</p>
-                                                <p className="text-xs text-slate-500">Patient Portal</p>
-                                            </div>
-                                        </div>
-                                        <p className="mt-4 max-w-xs text-sm text-slate-500">
-                                            A healthcare booking platform to help patients discover clinics, connect with doctors, and manage appointments.
-                                        </p>
-                                    </div>
-
-                                    {FOOTER_COLUMNS.map((column) => (
-                                        <div key={column.title}>
-                                            <h3 className="text-sm font-black text-slate-900">{column.title}</h3>
-                                            <div className="mt-3 space-y-2">
-                                                {column.links.map((link) => (
-                                                    <a key={link} href="#" className="block text-sm text-slate-500 hover:text-primary">
-                                                        {link}
-                                                    </a>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-8 flex flex-col gap-2 border-t border-slate-200 pt-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                                    <p>&copy; {currentYear} HealthSync Platform. All rights reserved.</p>
-                                    <p>Last updated: {updatedDate}</p>
-                                </div>
-                            </footer>
+                            <PatientPortalFooter />
                         </section>
                     </div>
                 ) : (

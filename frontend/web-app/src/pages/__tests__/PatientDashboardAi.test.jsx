@@ -1,5 +1,6 @@
 import React from 'react';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import PatientDashboard from '../PatientDashboard';
 import { renderWithProviders } from '../../utils/test-utils';
@@ -88,7 +89,7 @@ const baseState = {
     },
 };
 
-describe('PatientDashboard AI entry', () => {
+describe('PatientDashboard', () => {
     it('shows a dedicated CTA that links to the AI page', () => {
         window.history.replaceState(null, '', '/patient');
 
@@ -99,24 +100,17 @@ describe('PatientDashboard AI entry', () => {
         expect(screen.getByRole('link', { name: /Open AI symptom checker/i })).toHaveAttribute('href', '/patient/ai');
     });
 
-    it('applies AI prefill passed back from the AI page', async () => {
-        window.history.replaceState({
-            usr: {
-                aiPrefill: {
-                    specialtyId: 1,
-                    specialtyName: 'Cardiology',
-                    locationQuery: 'London Bridge',
-                },
-            },
-            key: 'prefill',
-            idx: 0,
-        }, '', '/patient');
+    it('uses the dashboard search area as a launcher to the discover page', async () => {
+        window.history.replaceState(null, '', '/patient');
 
         renderWithProviders(<PatientDashboard />, {
             preloadedState: baseState,
         });
 
-        expect(await screen.findByPlaceholderText(/Specialty/i)).toHaveValue('Cardiology');
-        expect(screen.getByPlaceholderText(/City or Postcode/i)).toHaveValue('London Bridge');
+        expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: /Open patient discover directory/i }));
+
+        expect(window.location.pathname).toBe('/patient/discover');
     });
 });

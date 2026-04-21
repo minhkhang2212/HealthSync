@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../store/slices/authSlice';
 import { clearAiError, resetAiSession, sendAiTriageMessage, startAiTriageSession } from '../store/slices/aiSlice';
+import PatientPortalFooter from '../components/layout/PatientPortalFooter';
+import PatientPortalHeader from '../components/layout/PatientPortalHeader';
+import { PATIENT_PORTAL_ROUTE_TARGETS } from '../components/layout/patientPortalConfig';
 
 const URGENCY_META = {
     low: { title: 'Low Urgency', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: 'verified' },
@@ -45,7 +48,6 @@ const PatientAiTriage = () => {
     const { user } = useSelector((state) => state.auth);
     const { sessionId, disclaimer, messages, latestTriage, latestRecommendations, loading, initializing, error } = useSelector((state) => state.ai);
 
-    const [menuOpen, setMenuOpen] = React.useState(false);
     const [draft, setDraft] = React.useState('');
     const autoStartRequestedRef = React.useRef(false);
     const chatViewportRef = React.useRef(null);
@@ -62,15 +64,6 @@ const PatientAiTriage = () => {
     const slotRecommendations = latestRecommendations?.slotRecommendations || [];
     const canViewSpecialists = Boolean(latestRecommendations?.prefill);
     const topSlot = slotRecommendations[0] || null;
-
-    React.useEffect(() => {
-        if (!menuOpen) return undefined;
-        const handleClickOutside = (event) => {
-            if (!event.target?.closest?.('[data-patient-menu]')) setMenuOpen(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [menuOpen]);
 
     React.useEffect(() => {
         if (sessionId || messages.length > 0 || initializing || autoStartRequestedRef.current) return;
@@ -108,68 +101,31 @@ const PatientAiTriage = () => {
 
     const handleViewRecommendedDoctors = () => {
         if (!latestRecommendations?.prefill) return;
-        navigate('/patient', { state: { aiPrefill: latestRecommendations.prefill } });
+        navigate('/patient/doctors', { state: { aiPrefill: latestRecommendations.prefill } });
     };
 
     const handleBookSlot = (slot) => {
         navigate(`/patient/doctor/${slot.doctorId}`, { state: buildDoctorAiPrefill(slot, latestRecommendations?.prefill) });
     };
 
+    const navigateToDashboardTarget = (portalTarget) => {
+        navigate('/patient', { state: { portalTarget } });
+    };
+
     return (
-        <div className="min-h-screen bg-[#f6f7f8] font-['Inter'] text-slate-900 antialiased">
-            <header className="fixed top-0 z-50 w-full border-b border-slate-200 bg-white/90 shadow-lg shadow-blue-500/5 backdrop-blur-xl">
-                <div className="mx-auto flex h-20 w-full max-w-[1440px] items-center justify-between gap-4 px-6 md:px-10">
-                    <Link to="/patient" className="flex items-center gap-3">
-                        <div className="grid size-9 place-items-center rounded-xl bg-primary text-white">
-                            <span className="material-symbols-outlined text-[20px]">health_and_safety</span>
-                        </div>
-                        <div>
-                            <p className="text-xl font-black tracking-tight text-slate-900">HealthSync</p>
-                            <p className="text-xs font-medium text-slate-500">Patient Portal</p>
-                        </div>
-                    </Link>
+        <div className="min-h-screen bg-slate-100 text-slate-900 antialiased">
+            <PatientPortalHeader
+                user={user}
+                activeItem="ai"
+                onHome={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.DASHBOARD)}
+                onFindDoctors={() => navigate('/patient/doctors')}
+                onClinics={() => navigate('/patient/clinics')}
+                onAiSupport={() => navigate('/patient/ai')}
+                onAppointments={() => navigateToDashboardTarget(PATIENT_PORTAL_ROUTE_TARGETS.APPOINTMENTS)}
+                onLogout={handleLogout}
+            />
 
-                    <nav className="hidden items-center gap-8 md:flex">
-                        <Link className="font-medium text-slate-500 transition-colors hover:text-primary" to="/patient">Dashboard</Link>
-                        <span className="border-b-4 border-primary pb-1 font-black text-primary">Symptom Checker</span>
-                        <Link className="font-medium text-slate-500 transition-colors hover:text-primary" to="/patient/clinics">Clinics</Link>
-                    </nav>
-
-                    <div className="flex items-center gap-4">
-                        <a href="tel:999" className="hidden rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 transition-transform active:scale-95 md:inline-flex">
-                            Emergency Help
-                        </a>
-                        <div className="relative" data-patient-menu>
-                            <button onClick={() => setMenuOpen((previous) => !previous)} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50">
-                                <div className="grid size-10 place-items-center rounded-full border-2 border-blue-100 bg-slate-100 text-slate-500">
-                                    <span className="material-symbols-outlined text-[24px]">account_circle</span>
-                                </div>
-                                <span className="hidden max-w-28 truncate text-sm font-semibold text-slate-700 lg:block">{user?.name}</span>
-                                <span className="material-symbols-outlined text-[18px] text-slate-400">expand_more</span>
-                            </button>
-                            {menuOpen && (
-                                <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-100 bg-white py-2 shadow-xl">
-                                    <div className="border-b border-slate-50 px-4 py-2">
-                                        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Patient Portal</p>
-                                    </div>
-                                    <Link to="/patient" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
-                                        <span className="material-symbols-outlined text-lg text-primary">dashboard</span>Dashboard
-                                    </Link>
-                                    <Link to="/patient/clinics" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50">
-                                        <span className="material-symbols-outlined text-lg text-primary">local_hospital</span>Clinics
-                                    </Link>
-                                    <div className="my-1 h-px bg-slate-100" />
-                                    <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-red-500 hover:bg-red-50">
-                                        <span className="material-symbols-outlined text-lg">logout</span>Logout
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            <main className="mx-auto max-w-[1440px] px-6 pb-16 pt-28 md:px-10">
+            <main className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-8 sm:px-8">
                 <section className="mb-10">
                     <div className="flex flex-col justify-between gap-6 border-l-8 border-primary pl-8 md:flex-row md:items-center">
                         <div className="max-w-3xl">
@@ -412,19 +368,9 @@ const PatientAiTriage = () => {
                 </div>
             </main>
 
-            <footer className="w-full border-t border-slate-200 bg-slate-50 py-12 text-xs tracking-wide">
-                <div className="mx-auto flex max-w-[1440px] flex-col items-center justify-between gap-6 px-6 md:flex-row md:px-10">
-                    <div>
-                        <div className="mb-2 font-black uppercase tracking-widest text-slate-400">HealthSync AI</div>
-                        <p className="text-slate-500">Clinical precision by design. Advisory triage only.</p>
-                    </div>
-                    <div className="flex flex-wrap justify-center gap-6">
-                        <Link className="text-slate-500 hover:text-slate-900" to="/patient">Dashboard</Link>
-                        <Link className="text-slate-500 hover:text-slate-900" to="/patient/clinics">Clinics</Link>
-                        <a className="font-bold text-primary" href="tel:999">Emergency Help</a>
-                    </div>
-                </div>
-            </footer>
+            <section className="w-full bg-white">
+                <PatientPortalFooter />
+            </section>
         </div>
     );
 };
