@@ -12,6 +12,7 @@ import NewDoctorModal from '../components/admin/NewDoctorModal';
 
 const navItems = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { to: '/admin/revenue', label: 'Revenue', icon: 'payments' },
     { to: '/admin/clinics', label: 'Clinics', icon: 'medical_services' },
     { to: '/admin/specialties', label: 'Specialties', icon: 'label' },
 ];
@@ -74,6 +75,19 @@ const getBookingDateParts = (date) => {
     };
 };
 
+const formatMinorCurrency = (amount, currency = 'gbp') => {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount)) return '-';
+
+    const currencyCode = String(currency || 'gbp').toUpperCase();
+    const majorAmount = numericAmount / 100;
+
+    return `${currencyCode} ${majorAmount.toLocaleString('en-GB', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+};
+
 const StatCard = ({ title, icon, value, note, iconClass = 'bg-primary/10 text-primary' }) => (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between">
@@ -98,7 +112,13 @@ const AdminDashboard = () => {
     const [usersLoading, setUsersLoading] = useState(false);
     const [usersError, setUsersError] = useState('');
     const [search, setSearch] = useState('');
-    const [bookingState, setBookingState] = useState({ loading: false, total: null, recent: [] });
+    const [bookingState, setBookingState] = useState({
+        loading: false,
+        total: null,
+        recent: [],
+        recognizedRevenueAmount: null,
+        recognizedRevenueCurrency: 'gbp',
+    });
     const [isNewDoctorOpen, setIsNewDoctorOpen] = useState(false);
     const [isEditDoctorOpen, setIsEditDoctorOpen] = useState(false);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
@@ -141,9 +161,23 @@ const AdminDashboard = () => {
                 const payload = response.data?.data ?? response.data;
                 const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
                 const total = Array.isArray(payload) ? payload.length : payload?.total ?? rows.length;
-                setBookingState({ loading: false, total, recent: rows.slice(0, 6) });
+                const recognizedRevenueAmount = Array.isArray(payload) ? null : payload?.recognizedRevenueAmount ?? null;
+                const recognizedRevenueCurrency = Array.isArray(payload) ? 'gbp' : payload?.recognizedRevenueCurrency ?? 'gbp';
+                setBookingState({
+                    loading: false,
+                    total,
+                    recent: rows.slice(0, 6),
+                    recognizedRevenueAmount,
+                    recognizedRevenueCurrency,
+                });
             } catch {
-                setBookingState({ loading: false, total: null, recent: [] });
+                setBookingState({
+                    loading: false,
+                    total: null,
+                    recent: [],
+                    recognizedRevenueAmount: null,
+                    recognizedRevenueCurrency: 'gbp',
+                });
             }
         };
         loadBookings();
@@ -289,7 +323,9 @@ const AdminDashboard = () => {
     const totalAdmins = users.filter((item) => item.roleId === 'R1').length;
     const totalPatients = users.filter((item) => item.roleId === 'R3').length;
     const totalDoctors = users.filter((item) => item.roleId === 'R2').length || rows.length;
-    const revenue = bookingState.total === null ? '-' : `GBP ${(bookingState.total * 35).toLocaleString('en-GB')}`;
+    const revenue = bookingState.recognizedRevenueAmount === null
+        ? '-'
+        : formatMinorCurrency(bookingState.recognizedRevenueAmount, bookingState.recognizedRevenueCurrency);
     const chartValues = [0.45, 0.63, 0.53, 0.84, 0.49, 0.71, 0.4].map((ratio) => Math.round(Math.max(totalDoctors * 8, 20) * ratio));
     const chartMax = Math.max(...chartValues, 1);
 
@@ -332,7 +368,7 @@ const AdminDashboard = () => {
                         <section className="flex flex-wrap items-end justify-between gap-3">
                             <div><h1 className="text-3xl font-black tracking-tight">Dashboard Overview</h1><p className="text-sm text-slate-500">Healthcare system metrics and performance summary.</p></div>
                             <div className="flex gap-2">
-                                <button type="button" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">Export Data</button>
+                                <Link to="/admin/revenue" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">Export Data</Link>
                                 <button type="button" onClick={() => setIsNewDoctorOpen(true)} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">New Doctor</button>
                             </div>
                         </section>
@@ -341,7 +377,7 @@ const AdminDashboard = () => {
                             <StatCard title="Total Users" icon="groups" value={usersLoading ? '-' : totalUsers} note={`Admins: ${totalAdmins} | Doctors: ${totalDoctors} | Patients: ${totalPatients}`} />
                             <StatCard title="Total Bookings" icon="calendar_month" value={bookingState.loading ? '-' : bookingState.total ?? '-'} note="Live data from recent booking activity." iconClass="bg-amber-100 text-amber-700" />
                             <StatCard title="Active Clinics" icon="location_on" value={clinicsLoading ? '-' : clinics.length} note="Registered locations in system." iconClass="bg-emerald-100 text-emerald-700" />
-                            <StatCard title="Total Revenue" icon="payments" value={revenue} note="Estimated by booking volume." />
+                            <StatCard title="Total Revenue" icon="payments" value={revenue} note="Current month. Use Export Data to review previous months and download PDF reports." />
                         </section>
 
                         <section className="space-y-3">

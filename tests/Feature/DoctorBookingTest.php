@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Mail\DoctorBookingConfirmationMail;
 use App\Mail\DoctorPrescriptionMail;
 use App\Models\Booking;
+use App\Services\BookingNotificationService;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class DoctorBookingTest extends TestCase
@@ -109,6 +111,10 @@ class DoctorBookingTest extends TestCase
             'timeType' => 'T1',
             'statusId' => 'S1',
             'confirmedAt' => now('Europe/London'),
+            'paymentMethod' => 'pay_at_clinic',
+            'paymentStatus' => 'pay_at_clinic',
+            'paymentAmount' => 3500,
+            'paymentCurrency' => 'gbp',
         ]);
 
         $this->actingAs($this->doctor, 'sanctum')
@@ -122,10 +128,56 @@ class DoctorBookingTest extends TestCase
         $this->assertDatabaseHas('booking', [
             'id' => $booking->id,
             'statusId' => 'S3',
+            'paymentStatus' => 'paid',
         ]);
         $this->assertNotNull($booking->prescriptionSentAt);
+        $this->assertNotNull($booking->paidAt);
         $this->assertStringStartsWith('/storage/booking-prescriptions/', $booking->prescriptionAttachment);
         Storage::disk('public')->assertExists(str_replace('/storage/', '', $booking->prescriptionAttachment));
         Mail::assertSent(DoctorPrescriptionMail::class, fn (DoctorPrescriptionMail $mail) => $mail->hasTo($this->contactEmail));
+    }
+
+    public function test_send_prescription_rolls_back_clinic_payment_state_when_notification_fails(): void
+    {
+        Storage::fake('public');
+
+        $this->mock(BookingNotificationService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sendPrescription')
+                ->once()
+                ->andThrow(new \RuntimeException('Mail transport failure.'));
+        });
+
+        $booking = Booking::create([
+            'doctorId' => $this->doctor->id,
+            'patientId' => $this->patient->id,
+            'patientContactEmail' => $this->contactEmail,
+            'date' => $this->bookingDate,
+            'timeType' => 'T1',
+            'statusId' => 'S1',
+            'confirmedAt' => now('Europe/London'),
+            'paymentMethod' => 'pay_at_clinic',
+            'paymentStatus' => 'pay_at_clinic',
+            'paymentAmount' => 3500,
+            'paymentCurrency' => 'gbp',
+            'paidAt' => null,
+        ]);
+
+        $this->actingAs($this->doctor, 'sanctum')
+            ->post("/api/doctor/bookings/{$booking->id}/send-prescription", [
+                'prescriptionFile' => UploadedFile::fake()->create('failed-prescription.pdf', 200, 'application/pdf'),
+            ])
+            ->assertStatus(422)
+            ->assertJsonFragment([
+                'message' => 'Unable to send the prescription right now. Please try again.',
+            ]);
+
+        $booking->refresh();
+
+        $this->assertSame('S1', $booking->statusId);
+        $this->assertSame('pay_at_clinic', $booking->paymentStatus);
+        $this->assertNull($booking->paidAt);
+        $this->assertNull($booking->prescriptionSentAt);
+        $this->assertNull($booking->prescriptionAttachment);
+        Storage::disk('public')->assertDirectoryEmpty('booking-prescriptions');
     }
 }

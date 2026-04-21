@@ -3,7 +3,9 @@
 namespace App\Repositories;
 
 use App\Models\Booking;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 
 class BookingRepository
 {
@@ -15,9 +17,82 @@ class BookingRepository
         ]);
     }
 
+    private function recognizedRevenueQuery()
+    {
+        return $this->baseQuery()
+            ->where('paymentStatus', 'paid')
+            ->whereNotNull('paymentAmount')
+            ->whereNotNull('paidAt');
+    }
+
     public function getAll(): Collection
     {
         return $this->baseQuery()->get();
+    }
+
+    public function getAdminFeed(): Collection
+    {
+        return $this->baseQuery()
+            ->orderByDesc('date')
+            ->orderByDesc('timeType')
+            ->get();
+    }
+
+    public function sumRecognizedRevenueBetween(CarbonInterface $start, CarbonInterface $end): int
+    {
+        return (int) Booking::query()
+            ->where('paymentStatus', 'paid')
+            ->whereNotNull('paymentAmount')
+            ->whereBetween('paidAt', [$start, $end])
+            ->sum('paymentAmount');
+    }
+
+    public function getRecognizedRevenueEntriesBetween(CarbonInterface $start, CarbonInterface $end): Collection
+    {
+        return $this->recognizedRevenueQuery()
+            ->whereBetween('paidAt', [$start, $end])
+            ->orderBy('paidAt')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function getRecognizedRevenueMonthlySummary(CarbonInterface $referenceDate): SupportCollection
+    {
+        $timezone = 'Europe/London';
+        $entries = $this->recognizedRevenueQuery()
+            ->orderByDesc('paidAt')
+            ->orderByDesc('id')
+            ->get();
+
+        $currentMonth = $referenceDate->copy()->timezone($timezone)->startOfMonth();
+        $firstPaidAt = $entries
+            ->last()?->paidAt
+            ?->copy()
+            ->timezone($timezone)
+            ->startOfMonth();
+
+        $startMonth = $firstPaidAt ?: $currentMonth->copy();
+        $groupedEntries = $entries->groupBy(
+            fn (Booking $booking) => $booking->paidAt->copy()->timezone($timezone)->format('Y-m')
+        );
+
+        $months = collect();
+        for ($cursor = $currentMonth->copy(); $cursor->greaterThanOrEqualTo($startMonth); $cursor->subMonthNoOverflow()) {
+            $monthKey = $cursor->format('Y-m');
+            $monthEntries = $groupedEntries->get($monthKey, collect());
+
+            $months->push([
+                'month' => $monthKey,
+                'label' => $cursor->format('F Y'),
+                'periodStart' => $cursor->copy()->startOfMonth()->toDateString(),
+                'periodEnd' => $cursor->copy()->endOfMonth()->toDateString(),
+                'recognizedRevenueAmount' => (int) $monthEntries->sum('paymentAmount'),
+                'recognizedRevenueCurrency' => 'gbp',
+                'paidBookingsCount' => $monthEntries->count(),
+            ]);
+        }
+
+        return $months;
     }
 
     public function findById(int $id): ?Booking

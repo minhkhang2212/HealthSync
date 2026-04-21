@@ -13,6 +13,7 @@ import DoctorAppointments from './pages/DoctorAppointments';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminRevenueReports from './pages/AdminRevenueReports';
 import ClinicManagement from './pages/ClinicManagement';
 import SpecialtyManagement from './pages/SpecialtyManagement';
 import PatientAiTriage from './pages/PatientAiTriage';
@@ -78,6 +79,7 @@ const AppRouter = () => {
                 <Route path="/admin" element={<ProtectedRoute allowedRoles={['R1']} />}>
                     <Route index element={<Navigate to="dashboard" replace />} />
                     <Route path="dashboard" element={<AdminDashboard />} />
+                    <Route path="revenue" element={<AdminRevenueReports />} />
                     <Route path="clinics" element={<ClinicManagement />} />
                     <Route path="specialties" element={<SpecialtyManagement />} />
                 </Route>

@@ -5,6 +5,7 @@ import { logoutUser } from '../../store/slices/authSlice';
 
 const navItems = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { to: '/admin/revenue', label: 'Revenue', icon: 'payments' },
     { to: '/admin/clinics', label: 'Clinics', icon: 'medical_services' },
     { to: '/admin/specialties', label: 'Specialties', icon: 'label' },
 ];

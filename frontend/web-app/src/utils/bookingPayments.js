@@ -12,6 +12,9 @@ export const isOnlinePaymentPending = (booking) =>
 export const isOnlinePaymentPaid = (booking) =>
     normalizePaymentMethod(booking) === 'stripe' && normalizePaymentStatus(booking) === 'paid';
 
+export const isClinicPaymentPaid = (booking) =>
+    normalizePaymentMethod(booking) === 'pay_at_clinic' && normalizePaymentStatus(booking) === 'paid';
+
 export const canPatientCancelBooking = (booking) => {
     if (!booking || booking.statusId !== 'S1' || booking.confirmedAt) return false;
     return !isOnlinePaymentPaid(booking);
@@ -36,6 +39,14 @@ export const getPaymentSummary = (booking) => {
             label: 'Paid online',
             tone: 'paid',
             detail: 'Paid securely by card or Apple Pay.',
+        };
+    }
+
+    if (isClinicPaymentPaid(booking)) {
+        return {
+            label: 'Paid at clinic',
+            tone: 'clinic_paid',
+            detail: 'Collected at the clinic and recognized after the visit was completed.',
         };
     }
 

@@ -102,6 +102,7 @@ class DoctorBookingController extends Controller
     public function sendPrescription(int $id, Request $request): JsonResponse
     {
         $booking = $this->bookingService->find($id);
+        $originalBooking = $booking ? clone $booking : null;
         
         if (!$booking || $booking->doctorId !== $request->user()->id) {
             return response()->json(['message' => 'Not found or unauthorized'], 404);
@@ -118,12 +119,19 @@ class DoctorBookingController extends Controller
             $this->bookingNotificationService->sendPrescription($booking);
             return response()->json($booking);
         } catch (Exception $e) {
-            if ($this->bookingHasDoctorAccess($booking, $request)) {
-                $this->bookingService->update($booking->id, [
+            if ($this->bookingHasDoctorAccess($originalBooking, $request)) {
+                $rollbackPayload = [
                     'statusId' => 'S1',
                     'prescriptionSentAt' => null,
                     'prescriptionAttachment' => null,
-                ]);
+                ];
+
+                if ($originalBooking->paymentMethod === 'pay_at_clinic') {
+                    $rollbackPayload['paymentStatus'] = $originalBooking->paymentStatus;
+                    $rollbackPayload['paidAt'] = $originalBooking->paidAt;
+                }
+
+                $this->bookingService->update($originalBooking->id, $rollbackPayload);
             }
 
             $this->deletePublicFile($attachmentPath);

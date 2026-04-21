@@ -19,6 +19,8 @@ Route::middleware(['auth:sanctum', 'role:R1'])->group(function () {
 
     // Bookings
     Route::get('/bookings', [BookingController::class, 'index']);
+    Route::get('/revenue/monthly', [BookingController::class, 'monthlyRevenue']);
+    Route::get('/revenue/monthly/{month}/pdf', [BookingController::class, 'monthlyRevenuePdf']);
 
     // Clinics
     Route::post('/clinics', [ClinicController::class, 'store']);

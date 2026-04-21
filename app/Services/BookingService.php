@@ -207,11 +207,18 @@ class BookingService
             throw new RuntimeException("Booking must be confirmed before sending prescription.");
         }
 
-        return $this->update($id, [
+        $payload = [
             'statusId' => 'S3',
             'prescriptionSentAt' => now('Europe/London'),
             'prescriptionAttachment' => $prescriptionAttachment,
-        ]);
+        ];
+
+        if ($booking->paymentMethod === 'pay_at_clinic' && $booking->paymentStatus !== 'paid') {
+            $payload['paymentStatus'] = 'paid';
+            $payload['paidAt'] = now('Europe/London');
+        }
+
+        return $this->update($id, $payload);
     }
 
     public function markNoShowByDoctor(int $id): Booking
