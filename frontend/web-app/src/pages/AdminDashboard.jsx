@@ -17,7 +17,8 @@ const navItems = [
     { to: '/admin/specialties', label: 'Specialties', icon: 'label' },
 ];
 
-const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTHLY_REVENUE_CHART_LIMIT = 6;
+const REVENUE_CHART_SKELETON_HEIGHTS = ['34%', '52%', '46%', '68%', '58%', '74%'];
 const DEFAULT_STATUS_LABELS = {
     S1: 'New',
     S2: 'Cancelled',
@@ -88,6 +89,68 @@ const formatMinorCurrency = (amount, currency = 'gbp') => {
     })}`;
 };
 
+const formatRevenueMonthShortLabel = (month) => {
+    const parsed = new Date(`${month}-01T00:00:00`);
+    if (Number.isNaN(parsed.getTime())) return month;
+
+    return parsed.toLocaleDateString('en-GB', { month: 'short' });
+};
+
+const parseRevenueMonth = (month) => {
+    const matched = /^(\d{4})-(\d{2})$/.exec(String(month || ''));
+    if (!matched) return null;
+
+    const year = Number.parseInt(matched[1], 10);
+    const monthIndex = Number.parseInt(matched[2], 10) - 1;
+    if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+        return null;
+    }
+
+    return new Date(year, monthIndex, 1);
+};
+
+const formatRevenueMonthKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+};
+
+const formatRevenueMonthLongLabel = (date) =>
+    date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
+const buildRevenueTrendWindow = (items, currentMonth, currency, limit = MONTHLY_REVENUE_CHART_LIMIT) => {
+    const anchorDate = parseRevenueMonth(currentMonth) || parseRevenueMonth(items[0]?.month);
+    if (!anchorDate) return [];
+
+    const itemMap = new Map(items.map((item) => [item.month, item]));
+    const resolvedCurrency = currency || 'gbp';
+    const window = [];
+
+    for (let offset = limit - 1; offset >= 0; offset -= 1) {
+        const monthDate = new Date(anchorDate.getFullYear(), anchorDate.getMonth() - offset, 1);
+        const monthKey = formatRevenueMonthKey(monthDate);
+        const existingItem = itemMap.get(monthKey);
+
+        window.push(existingItem || {
+            month: monthKey,
+            label: formatRevenueMonthLongLabel(monthDate),
+            recognizedRevenueAmount: 0,
+            recognizedRevenueCurrency: resolvedCurrency,
+            paidBookingsCount: 0,
+        });
+    }
+
+    return window;
+};
+
+const getRevenueBarHeight = (amount, maxAmount) => {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) return '0%';
+
+    const safeMaxAmount = Math.max(Number(maxAmount) || 0, 1);
+    return `${Math.max((numericAmount / safeMaxAmount) * 100, 12)}%`;
+};
+
 const StatCard = ({ title, icon, value, note, iconClass = 'bg-primary/10 text-primary' }) => (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start justify-between">
@@ -118,6 +181,14 @@ const AdminDashboard = () => {
         recent: [],
         recognizedRevenueAmount: null,
         recognizedRevenueCurrency: 'gbp',
+    });
+    const [activeRevenueTooltipMonth, setActiveRevenueTooltipMonth] = useState('');
+    const [revenueTrendState, setRevenueTrendState] = useState({
+        loading: true,
+        error: '',
+        items: [],
+        currentMonth: '',
+        currency: 'gbp',
     });
     const [isNewDoctorOpen, setIsNewDoctorOpen] = useState(false);
     const [isEditDoctorOpen, setIsEditDoctorOpen] = useState(false);
@@ -181,6 +252,48 @@ const AdminDashboard = () => {
             }
         };
         loadBookings();
+    }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadRevenueTrend = async () => {
+            setRevenueTrendState((prev) => ({
+                ...prev,
+                loading: true,
+                error: '',
+            }));
+
+            try {
+                const response = await apiClient.get('/admin/revenue/monthly');
+                const payload = response.data?.data ?? response.data;
+                if (!isMounted) return;
+
+                setRevenueTrendState({
+                    loading: false,
+                    error: '',
+                    items: Array.isArray(payload?.items) ? payload.items : [],
+                    currentMonth: payload?.currentMonth || '',
+                    currency: payload?.recognizedRevenueCurrency || 'gbp',
+                });
+            } catch (error) {
+                if (!isMounted) return;
+
+                setRevenueTrendState({
+                    loading: false,
+                    error: error.response?.data?.message || 'Revenue trend unavailable right now.',
+                    items: [],
+                    currentMonth: '',
+                    currency: 'gbp',
+                });
+            }
+        };
+
+        loadRevenueTrend();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -326,8 +439,19 @@ const AdminDashboard = () => {
     const revenue = bookingState.recognizedRevenueAmount === null
         ? '-'
         : formatMinorCurrency(bookingState.recognizedRevenueAmount, bookingState.recognizedRevenueCurrency);
-    const chartValues = [0.45, 0.63, 0.53, 0.84, 0.49, 0.71, 0.4].map((ratio) => Math.round(Math.max(totalDoctors * 8, 20) * ratio));
-    const chartMax = Math.max(...chartValues, 1);
+    const revenueTrendItems = useMemo(
+        () => buildRevenueTrendWindow(
+            revenueTrendState.items,
+            revenueTrendState.currentMonth,
+            revenueTrendState.currency,
+            MONTHLY_REVENUE_CHART_LIMIT
+        ),
+        [revenueTrendState.items, revenueTrendState.currentMonth, revenueTrendState.currency]
+    );
+    const revenueTrendMax = useMemo(
+        () => Math.max(...revenueTrendItems.map((item) => Number(item.recognizedRevenueAmount) || 0), 1),
+        [revenueTrendItems]
+    );
 
     return (
         <div className="min-h-screen bg-background-light text-slate-900 font-display">
@@ -474,15 +598,87 @@ const AdminDashboard = () => {
 
                         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                             <h2 className="text-xl font-black">Consultation Revenue</h2>
+                            <p className="mt-1 text-sm text-slate-500">Last 6 months of recognized consultation revenue.</p>
                             <div className="mt-4 h-56">
-                                <div className="flex h-full items-end gap-3">
-                                    {chartValues.map((value, index) => (
-                                        <div key={days[index]} className="flex flex-1 flex-col justify-end">
-                                            <div className={`${index === 3 ? 'bg-primary' : 'bg-primary/35'} rounded-t-lg`} style={{ height: `${Math.max((value / chartMax) * 100, 12)}%` }}></div>
-                                            <p className="mt-2 text-center text-xs font-bold text-slate-400">{days[index]}</p>
-                                        </div>
-                                    ))}
-                                </div>
+                                {revenueTrendState.loading ? (
+                                    <div
+                                        role="status"
+                                        aria-label="Loading revenue trend"
+                                        data-testid="consultation-revenue-loading"
+                                        className="flex h-full items-stretch gap-3 animate-pulse"
+                                    >
+                                        {REVENUE_CHART_SKELETON_HEIGHTS.map((height, index) => (
+                                            <div key={`skeleton-${index}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
+                                                <div className="flex min-h-0 flex-1 items-end rounded-t-xl bg-slate-100 px-1 pb-0">
+                                                    <div className="w-full rounded-t-lg bg-slate-200" style={{ height }}></div>
+                                                </div>
+                                                <div className="mx-auto mt-3 h-3 w-8 rounded bg-slate-100"></div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : revenueTrendState.error ? (
+                                    <div
+                                        data-testid="consultation-revenue-error"
+                                        className="flex h-full items-center justify-center rounded-xl border border-red-100 bg-red-50/70 px-4 text-center text-sm text-red-700"
+                                    >
+                                        {revenueTrendState.error}
+                                    </div>
+                                ) : revenueTrendItems.length === 0 ? (
+                                    <div
+                                        data-testid="consultation-revenue-empty"
+                                        className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-sm text-slate-500"
+                                    >
+                                        Revenue trend unavailable right now.
+                                    </div>
+                                ) : (
+                                    <div data-testid="consultation-revenue-chart" className="flex h-full items-stretch gap-3">
+                                        {revenueTrendItems.map((item) => {
+                                            const amount = Number(item.recognizedRevenueAmount) || 0;
+                                            const isCurrentMonth = item.month === revenueTrendState.currentMonth;
+                                            const fullLabel = item.label || item.month;
+                                            const amountLabel = formatMinorCurrency(amount, item.recognizedRevenueCurrency || revenueTrendState.currency);
+                                            const shortLabel = formatRevenueMonthShortLabel(item.month);
+
+                                            return (
+                                                <div
+                                                    key={item.month}
+                                                    role="img"
+                                                    title={`${fullLabel}: ${amountLabel}`}
+                                                    aria-label={`${fullLabel}: ${amountLabel}`}
+                                                    data-testid={`revenue-bar-${item.month}`}
+                                                    data-month={item.month}
+                                                    data-current-month={isCurrentMonth ? 'true' : 'false'}
+                                                    tabIndex={0}
+                                                    onMouseEnter={() => setActiveRevenueTooltipMonth(item.month)}
+                                                    onMouseLeave={() => setActiveRevenueTooltipMonth((current) => (current === item.month ? '' : current))}
+                                                    onFocus={() => setActiveRevenueTooltipMonth(item.month)}
+                                                    onBlur={() => setActiveRevenueTooltipMonth((current) => (current === item.month ? '' : current))}
+                                                    className="relative flex h-full min-w-0 flex-1 flex-col justify-end outline-none"
+                                                >
+                                                    {activeRevenueTooltipMonth === item.month && (
+                                                        <div
+                                                            data-testid={`revenue-tooltip-${item.month}`}
+                                                            className="pointer-events-none absolute left-1/2 top-2 z-10 w-max max-w-[calc(100%-8px)] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-xs text-white shadow-lg"
+                                                        >
+                                                            <p className="font-black">{fullLabel}</p>
+                                                            <p className="mt-0.5 font-semibold text-slate-200">{amountLabel}</p>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex min-h-0 flex-1 items-end rounded-t-xl bg-slate-50/70 px-1 pb-0">
+                                                        <div
+                                                            data-testid={`revenue-bar-fill-${item.month}`}
+                                                            className={`w-full rounded-t-lg transition-[height,background-color] duration-300 ${isCurrentMonth ? 'bg-primary shadow-[0_10px_24px_rgba(37,99,235,0.28)]' : 'bg-primary/35'}`}
+                                                            style={{ height: getRevenueBarHeight(amount, revenueTrendMax) }}
+                                                        ></div>
+                                                    </div>
+                                                    <p className={`mt-2 text-center text-xs font-bold ${isCurrentMonth ? 'text-slate-700' : 'text-slate-400'}`}>
+                                                        {shortLabel}
+                                                    </p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </section>
                     </div>
