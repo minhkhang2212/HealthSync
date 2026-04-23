@@ -30,17 +30,41 @@ const resolveImageSource = (value, apiAssetBase) => {
     return `data:image/jpeg;base64,${trimmed}`;
 };
 
+const normalizeSearchText = (value) =>
+    String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+
 const ClinicManagement = () => {
     const dispatch = useDispatch();
     const fileInputRef = useRef(null);
 
     const { clinics, loading, error } = useSelector((state) => state.clinic);
+    const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingClinic, setEditingClinic] = useState(null);
     const [formData, setFormData] = useState(INITIAL_FORM);
     const [imagePreview, setImagePreview] = useState('');
 
     const apiAssetBase = useMemo(() => getApiAssetBase(), []);
+    const filteredClinics = useMemo(() => {
+        const searchKey = normalizeSearchText(search);
+
+        if (!searchKey) {
+            return clinics;
+        }
+
+        return clinics.filter((clinic) =>
+            normalizeSearchText(
+                `${clinic.id || ''} ${clinic.name || ''} ${clinic.address || ''} ${clinic.description || ''}`
+            ).includes(searchKey)
+        );
+    }, [clinics, search]);
+    const showingText = filteredClinics.length === clinics.length
+        ? `Showing all ${clinics.length} clinics.`
+        : `Showing ${filteredClinics.length} of ${clinics.length} clinics.`;
 
     useEffect(() => {
         if (clinics.length === 0) {
@@ -176,11 +200,36 @@ const ClinicManagement = () => {
                 </button>
             </section>
 
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="space-y-4">
+                    <label className="space-y-2 text-sm font-semibold text-slate-700">
+                        <span>Search</span>
+                        <div className="flex h-11 items-center rounded-lg border border-slate-300 bg-white text-slate-500 focus-within:border-primary">
+                            <span className="material-symbols-outlined pl-3 text-[20px]">search</span>
+                            <input
+                                type="search"
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                placeholder="Search clinics by name, address, description..."
+                                className="h-full w-full bg-transparent px-2 pr-3 text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400"
+                            />
+                        </div>
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-sm">
+                        <span className="font-semibold text-slate-700">{showingText}</span>
+                        <span className="text-slate-500">Search matches clinic name, address, description, and ID.</span>
+                    </div>
+                </div>
+            </section>
+
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 {loading ? (
                     <div className="py-16 text-center text-slate-500">Loading clinics...</div>
                 ) : clinics.length === 0 ? (
                     <div className="py-16 text-center text-slate-400">No clinics found.</div>
+                ) : filteredClinics.length === 0 ? (
+                    <div className="py-16 text-center text-slate-400">No clinics match the current search.</div>
                 ) : (
                     <table className="w-full min-w-[760px] text-left">
                         <thead className="border-b border-slate-200 bg-slate-50">
@@ -192,7 +241,7 @@ const ClinicManagement = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
-                            {clinics.map((clinic) => {
+                            {filteredClinics.map((clinic) => {
                                 const thumbnail = resolveImageSource(clinic.image, apiAssetBase);
                                 return (
                                     <tr key={clinic.id} className="hover:bg-slate-50">

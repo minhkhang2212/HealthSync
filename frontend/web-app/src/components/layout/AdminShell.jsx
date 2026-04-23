@@ -1,10 +1,11 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../store/slices/authSlice';
 
 const navItems = [
     { to: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
+    { to: '/admin/doctors', label: 'Doctors', icon: 'badge' },
+    { to: '/admin/bookings', label: 'Bookings', icon: 'calendar_month' },
     { to: '/admin/revenue', label: 'Revenue', icon: 'payments' },
     { to: '/admin/clinics', label: 'Clinics', icon: 'medical_services' },
     { to: '/admin/specialties', label: 'Specialties', icon: 'label' },
@@ -12,23 +13,9 @@ const navItems = [
 
 const AdminShell = ({
     children,
-    searchValue,
-    onSearchChange,
-    searchPlaceholder = 'Search doctors, clinics, specialties...',
 }) => {
     const dispatch = useDispatch();
     const { user } = useSelector((state) => state.auth);
-    const [localSearch, setLocalSearch] = React.useState('');
-
-    const value = typeof searchValue === 'string' ? searchValue : localSearch;
-    const handleChange = (event) => {
-        const next = event.target.value;
-        if (onSearchChange) {
-            onSearchChange(next);
-            return;
-        }
-        setLocalSearch(next);
-    };
 
     return (
         <div className="min-h-screen bg-background-light text-slate-900 font-display">
@@ -39,17 +26,6 @@ const AdminShell = ({
                             <span className="material-symbols-outlined text-primary">health_and_safety</span>
                         </div>
                         <p className="text-lg font-bold tracking-tight">HealthSync</p>
-                        <label className="hidden md:block ml-4">
-                            <div className="flex h-10 w-80 items-center rounded-lg bg-slate-100 text-slate-600">
-                                <span className="material-symbols-outlined pl-3 text-base">search</span>
-                                <input
-                                    className="h-full w-full bg-transparent px-2 text-sm outline-none placeholder:text-slate-500"
-                                    placeholder={searchPlaceholder}
-                                    value={value}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </label>
                     </div>
 
                     <div className="hidden sm:flex items-center gap-3">

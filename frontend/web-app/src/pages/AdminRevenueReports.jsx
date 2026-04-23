@@ -114,7 +114,7 @@ const AdminRevenueReports = () => {
     const currentMonthCard = summaryState.items.find((item) => item.month === summaryState.currentMonth) || summaryState.items[0] || null;
 
     return (
-        <AdminShell searchPlaceholder="Revenue reports are not searchable yet.">
+        <AdminShell>
             {summaryState.error && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {summaryState.error}

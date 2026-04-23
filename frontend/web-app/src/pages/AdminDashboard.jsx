@@ -1,70 +1,25 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchClinics } from '../store/slices/clinicSlice';
 import { fetchSpecialties } from '../store/slices/specialtySlice';
 import { fetchDoctors } from '../store/slices/doctorSlice';
-import { logoutUser } from '../store/slices/authSlice';
 import apiClient from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 import { DEFAULT_TIME_LABELS } from '../utils/timeSlots';
 import NewDoctorModal from '../components/admin/NewDoctorModal';
+import AdminShell from '../components/layout/AdminShell';
+import {
+    DEFAULT_ADMIN_BOOKING_STATUS_LABELS,
+    buildAdminBookingRows,
+    buildDoctorAdminRows,
+    sortByNewestCreated,
+} from '../utils/adminManagement';
 
-const navItems = [
-    { to: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { to: '/admin/revenue', label: 'Revenue', icon: 'payments' },
-    { to: '/admin/clinics', label: 'Clinics', icon: 'medical_services' },
-    { to: '/admin/specialties', label: 'Specialties', icon: 'label' },
-];
-
+const DOCTOR_PREVIEW_LIMIT = 4;
+const BOOKING_PREVIEW_LIMIT = 3;
 const MONTHLY_REVENUE_CHART_LIMIT = 6;
 const REVENUE_CHART_SKELETON_HEIGHTS = ['34%', '52%', '46%', '68%', '58%', '74%'];
-const DEFAULT_STATUS_LABELS = {
-    S1: 'New',
-    S2: 'Cancelled',
-    S3: 'Done',
-    S4: 'No-show',
-};
-
-const getBookingStatusMeta = (booking, statusLabels) => {
-    if (booking.statusId === 'S2') {
-        return {
-            label: statusLabels.S2 || 'Cancelled',
-            chipClass: 'text-red-700 bg-red-100',
-            dateClass: 'bg-red-100 text-red-600',
-        };
-    }
-
-    if (booking.statusId === 'S3') {
-        return {
-            label: statusLabels.S3 || 'Done',
-            chipClass: 'text-emerald-700 bg-emerald-100',
-            dateClass: 'bg-emerald-100 text-emerald-700',
-        };
-    }
-
-    if (booking.statusId === 'S4') {
-        return {
-            label: statusLabels.S4 || 'No-show',
-            chipClass: 'text-amber-700 bg-amber-100',
-            dateClass: 'bg-amber-100 text-amber-700',
-        };
-    }
-
-    if (booking.confirmedAt) {
-        return {
-            label: 'Confirmed',
-            chipClass: 'text-blue-700 bg-blue-100',
-            dateClass: 'bg-blue-100 text-primary',
-        };
-    }
-
-    return {
-        label: statusLabels.S1 || 'New',
-        chipClass: 'text-slate-700 bg-slate-100',
-        dateClass: 'bg-slate-200 text-slate-600',
-    };
-};
 
 const getBookingDateParts = (date) => {
     const parsed = new Date(`${date}T00:00:00`);
@@ -166,7 +121,6 @@ const StatCard = ({ title, icon, value, note, iconClass = 'bg-primary/10 text-pr
 
 const AdminDashboard = () => {
     const dispatch = useDispatch();
-    const { user } = useSelector((state) => state.auth);
     const { clinics, loading: clinicsLoading } = useSelector((state) => state.clinic);
     const { specialties, loading: specialtiesLoading } = useSelector((state) => state.specialty);
     const { doctors, loading: doctorsLoading } = useSelector((state) => state.doctor);
@@ -174,11 +128,10 @@ const AdminDashboard = () => {
     const [users, setUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
     const [usersError, setUsersError] = useState('');
-    const [search, setSearch] = useState('');
     const [bookingState, setBookingState] = useState({
         loading: false,
         total: null,
-        recent: [],
+        items: [],
         recognizedRevenueAmount: null,
         recognizedRevenueCurrency: 'gbp',
     });
@@ -195,7 +148,7 @@ const AdminDashboard = () => {
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [doctorActionId, setDoctorActionId] = useState(null);
     const [doctorNotice, setDoctorNotice] = useState('');
-    const [statusLabels, setStatusLabels] = useState(DEFAULT_STATUS_LABELS);
+    const [statusLabels, setStatusLabels] = useState(DEFAULT_ADMIN_BOOKING_STATUS_LABELS);
     const [timeLabels, setTimeLabels] = useState(DEFAULT_TIME_LABELS);
 
     const loadUsers = useCallback(async () => {
@@ -230,14 +183,15 @@ const AdminDashboard = () => {
             try {
                 const response = await apiClient.get('/admin/bookings');
                 const payload = response.data?.data ?? response.data;
-                const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
-                const total = Array.isArray(payload) ? payload.length : payload?.total ?? rows.length;
+                const items = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
+                const total = Array.isArray(payload) ? payload.length : payload?.total ?? items.length;
                 const recognizedRevenueAmount = Array.isArray(payload) ? null : payload?.recognizedRevenueAmount ?? null;
                 const recognizedRevenueCurrency = Array.isArray(payload) ? 'gbp' : payload?.recognizedRevenueCurrency ?? 'gbp';
+
                 setBookingState({
                     loading: false,
                     total,
-                    recent: rows.slice(0, 6),
+                    items,
                     recognizedRevenueAmount,
                     recognizedRevenueCurrency,
                 });
@@ -245,12 +199,13 @@ const AdminDashboard = () => {
                 setBookingState({
                     loading: false,
                     total: null,
-                    recent: [],
+                    items: [],
                     recognizedRevenueAmount: null,
                     recognizedRevenueCurrency: 'gbp',
                 });
             }
         };
+
         loadBookings();
     }, []);
 
@@ -318,7 +273,7 @@ const AdminDashboard = () => {
                     writeAllcodeCache('TIME', timeRes.data);
                 }
 
-                const nextStatus = { ...DEFAULT_STATUS_LABELS };
+                const nextStatus = { ...DEFAULT_ADMIN_BOOKING_STATUS_LABELS };
                 const nextTime = { ...DEFAULT_TIME_LABELS };
 
                 for (const item of statusRes.data || []) {
@@ -331,7 +286,7 @@ const AdminDashboard = () => {
                 setStatusLabels(nextStatus);
                 setTimeLabels(nextTime);
             } catch {
-                setStatusLabels(DEFAULT_STATUS_LABELS);
+                setStatusLabels(DEFAULT_ADMIN_BOOKING_STATUS_LABELS);
                 setTimeLabels(DEFAULT_TIME_LABELS);
             }
         };
@@ -381,61 +336,51 @@ const AdminDashboard = () => {
         }
     }, [dispatch]);
 
-    const clinicNames = useMemo(() => Object.fromEntries(clinics.map((c) => [String(c.id), c.name])), [clinics]);
-    const specialtyNames = useMemo(() => Object.fromEntries(specialties.map((s) => [String(s.id), s.name])), [specialties]);
-    const rows = useMemo(() => doctors.map((doctor) => {
-        const doctorInfor = doctor.doctor_infor || doctor.doctorInfor;
-        const relations = doctor.doctor_clinic_specialties || doctor.doctorClinicSpecialties || [];
-        const rel = relations[0];
-        const clinicId = rel?.clinicId ?? rel?.clinic_id;
-        const specialtyId = rel?.specialtyId ?? rel?.specialty_id;
-        const isActive = doctor.isActive !== false;
-        const hasProfile = Boolean(doctorInfor);
+    const clinicNames = useMemo(
+        () => Object.fromEntries(clinics.map((clinic) => [String(clinic.id), clinic.name])),
+        [clinics]
+    );
+    const specialtyNames = useMemo(
+        () => Object.fromEntries(specialties.map((specialty) => [String(specialty.id), specialty.name])),
+        [specialties]
+    );
 
-        let statusText = 'Pending Setup';
-        let statusClass = 'text-amber-700 bg-amber-100';
-        if (!isActive) {
-            statusText = 'Inactive';
-            statusClass = 'text-rose-700 bg-rose-100';
-        } else if (hasProfile) {
-            statusText = 'Active';
-            statusClass = 'text-emerald-700 bg-emerald-100';
-        }
-
-        return {
-            id: doctor.id,
-            name: doctor.name || 'Unknown',
-            email: doctor.email || 'No email',
-            clinic: rel?.clinic?.name || clinicNames[String(clinicId)] || doctorInfor?.nameClinic || doctorInfor?.name_clinic || 'Not assigned',
-            specialty: rel?.specialty?.name || specialtyNames[String(specialtyId)] || 'General',
-            isActive,
-            statusText,
-            statusClass,
-            raw: doctor,
-        };
-    }), [doctors, clinicNames, specialtyNames]);
-
-    const filteredRows = useMemo(() => {
-        const key = search.trim().toLowerCase();
-        if (!key) return rows;
-        return rows.filter((item) => `${item.name} ${item.email} ${item.clinic} ${item.specialty}`.toLowerCase().includes(key));
-    }, [rows, search]);
+    const doctorRows = useMemo(
+        () => buildDoctorAdminRows(doctors, clinicNames, specialtyNames),
+        [doctors, clinicNames, specialtyNames]
+    );
+    const doctorRowsByNewest = useMemo(() => sortByNewestCreated(doctorRows), [doctorRows]);
+    const previewDoctors = useMemo(
+        () => doctorRowsByNewest.slice(0, DOCTOR_PREVIEW_LIMIT),
+        [doctorRowsByNewest]
+    );
 
     const doctorSpecialtyById = useMemo(() => {
         const map = {};
-        for (const doctor of doctors) {
-            const relations = doctor.doctor_clinic_specialties || doctor.doctorClinicSpecialties || [];
-            const rel = relations[0];
-            const specialtyId = rel?.specialtyId ?? rel?.specialty_id;
-            map[String(doctor.id)] = rel?.specialty?.name || specialtyNames[String(specialtyId)] || 'General';
+        for (const doctorRow of doctorRows) {
+            map[String(doctorRow.id)] = doctorRow.specialty;
         }
         return map;
-    }, [doctors, specialtyNames]);
+    }, [doctorRows]);
+
+    const bookingRows = useMemo(
+        () => buildAdminBookingRows(bookingState.items, {
+            doctorSpecialtyById,
+            statusLabels,
+            timeLabels,
+        }),
+        [bookingState.items, doctorSpecialtyById, statusLabels, timeLabels]
+    );
+    const bookingRowsByNewest = useMemo(() => sortByNewestCreated(bookingRows), [bookingRows]);
+    const previewBookings = useMemo(
+        () => bookingRowsByNewest.slice(0, BOOKING_PREVIEW_LIMIT),
+        [bookingRowsByNewest]
+    );
 
     const totalUsers = users.length;
     const totalAdmins = users.filter((item) => item.roleId === 'R1').length;
     const totalPatients = users.filter((item) => item.roleId === 'R3').length;
-    const totalDoctors = users.filter((item) => item.roleId === 'R2').length || rows.length;
+    const totalDoctors = users.filter((item) => item.roleId === 'R2').length || doctorRows.length;
     const revenue = bookingState.recognizedRevenueAmount === null
         ? '-'
         : formatMinorCurrency(bookingState.recognizedRevenueAmount, bookingState.recognizedRevenueCurrency);
@@ -454,236 +399,248 @@ const AdminDashboard = () => {
     );
 
     return (
-        <div className="min-h-screen bg-background-light text-slate-900 font-display">
-            <header className="sticky top-0 z-40 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="size-8 rounded-lg bg-primary/10 grid place-items-center"><span className="material-symbols-outlined text-primary">health_and_safety</span></div>
-                        <p className="text-lg font-bold tracking-tight">HealthSync</p>
-                        <label className="hidden md:block ml-4">
-                            <div className="flex h-10 w-80 items-center rounded-lg bg-slate-100 text-slate-600">
-                                <span className="material-symbols-outlined pl-3 text-base">search</span>
-                                <input className="h-full w-full bg-transparent px-2 text-sm outline-none" placeholder="Search doctors, clinics, specialties..." value={search} onChange={(event) => setSearch(event.target.value)} />
-                            </div>
-                        </label>
+        <AdminShell>
+            {usersError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{usersError}</div>}
+            {doctorNotice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{doctorNotice}</div>}
+
+            <section className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight">Dashboard Overview</h1>
+                    <p className="text-sm text-slate-500">Healthcare system metrics and performance summary.</p>
+                </div>
+                <div className="flex gap-2">
+                    <Link to="/admin/revenue" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">
+                        Export Data
+                    </Link>
+                    <button
+                        type="button"
+                        onClick={() => setIsNewDoctorOpen(true)}
+                        className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"
+                    >
+                        New Doctor
+                    </button>
+                </div>
+            </section>
+
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard title="Total Users" icon="groups" value={usersLoading ? '-' : totalUsers} note={`Admins: ${totalAdmins} | Doctors: ${totalDoctors} | Patients: ${totalPatients}`} />
+                <StatCard title="Total Bookings" icon="calendar_month" value={bookingState.loading ? '-' : bookingState.total ?? '-'} note="Live data from recent booking activity." iconClass="bg-amber-100 text-amber-700" />
+                <StatCard title="Active Clinics" icon="location_on" value={clinicsLoading ? '-' : clinics.length} note="Registered locations in system." iconClass="bg-emerald-100 text-emerald-700" />
+                <StatCard title="Total Revenue" icon="payments" value={revenue} note="Current month. Use Export Data to review previous months and download PDF reports." />
+            </section>
+
+            <section className="space-y-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h2 className="text-2xl font-black tracking-tight">User Management - Doctors</h2>
+                        <p className="mt-1 text-sm text-slate-500">Showing the latest 4 doctors added to the system.</p>
                     </div>
-                    <div className="hidden sm:flex items-center gap-3">
-                        <span className="text-sm font-bold">{user?.name || 'System Admin'}</span>
-                        <button type="button" onClick={() => dispatch(logoutUser())} className="rounded-lg bg-red-100 px-3 py-2 text-xs font-bold text-red-700">Sign Out</button>
+                    <Link to="/admin/doctors" className="text-sm font-black text-primary hover:text-blue-700">
+                        View Full Doctors
+                    </Link>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="w-full min-w-[700px] text-left" data-testid="dashboard-doctors-preview-table">
+                        <thead className="border-b border-slate-200 bg-slate-50">
+                            <tr>
+                                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Doctor</th>
+                                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Specialty</th>
+                                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Clinic</th>
+                                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th>
+                                <th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                            {doctorsLoading ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-sm text-slate-500">Loading doctors...</td>
+                                </tr>
+                            ) : previewDoctors.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-sm text-slate-500">No doctors yet.</td>
+                                </tr>
+                            ) : previewDoctors.map((doctor) => (
+                                <tr key={doctor.id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4">
+                                        <p className="text-sm font-bold">{doctor.name}</p>
+                                        <p className="text-xs text-slate-500">{doctor.email}</p>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">{doctor.specialty}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-slate-600">{doctor.clinic}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${doctor.statusClass}`}>{doctor.statusText}</span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenEditDoctor(doctor.raw)}
+                                                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-primary hover:text-primary"
+                                            >
+                                                Edit Profile
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleDoctorActive(doctor.raw)}
+                                                disabled={doctorActionId === doctor.id}
+                                                className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60 ${doctor.isActive ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+                                            >
+                                                {doctorActionId === doctor.id ? 'Saving...' : doctor.isActive ? 'Set Inactive' : 'Activate'}
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                            <h2 className="text-lg font-black">Booking Management</h2>
+                            <p className="mt-1 text-sm text-slate-500">Showing the latest 3 bookings created in the system.</p>
+                        </div>
+                        <Link to="/admin/bookings" className="text-sm font-black text-primary hover:text-blue-700">
+                            View Full Bookings
+                        </Link>
+                    </div>
+                    <div className="mt-3 space-y-2.5" data-testid="dashboard-bookings-preview-list">
+                        {bookingState.loading ? (
+                            <p className="text-sm text-slate-500">Loading bookings...</p>
+                        ) : previewBookings.length === 0 ? (
+                            <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No bookings have been created yet.</p>
+                        ) : previewBookings.map((item) => {
+                            const dateParts = getBookingDateParts(item.appointmentDate);
+
+                            return (
+                                <div key={item.id} data-testid={`dashboard-booking-${item.id}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2.5 sm:px-3">
+                                    <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${item.statusDateClass}`}>
+                                        <div className="text-center leading-none">
+                                            <p className="text-[9px] font-black tracking-wide">{dateParts.month}</p>
+                                            <p className="mt-0.5 text-[20px] font-black">{Number.parseInt(dateParts.day, 10) || dateParts.day}</p>
+                                        </div>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-black sm:text-base">Patient: {item.patientName}</p>
+                                        <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">{item.doctorName} • {item.specialtyName}</p>
+                                        <p className="mt-1 truncate text-[11px] font-semibold text-slate-400">Created {item.createdDateLabel}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${item.statusChipClass}`}>
+                                            {String(item.statusLabel).toUpperCase()}
+                                        </span>
+                                        <p className="mt-1 text-[11px] font-bold text-slate-400">{item.timeLabel}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
-            </header>
 
-            <div className="flex min-h-[calc(100vh-65px)]">
-                <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white p-3 lg:block">
-                    {navItems.map((item) => (
-                        <NavLink key={item.to} to={item.to} className={({ isActive }) => `mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium ${isActive ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
-                            <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                            {item.label}
-                        </NavLink>
-                    ))}
-                </aside>
+                <div className="space-y-3">
+                    <h2 className="text-xl font-black">Master Data</h2>
+                    <Link to="/admin/clinics" className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40">
+                        <p className="text-sm font-bold">Clinics</p>
+                        <p className="text-xs text-slate-500">{clinicsLoading ? '-' : clinics.length} active locations</p>
+                    </Link>
+                    <Link to="/admin/specialties" className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40">
+                        <p className="text-sm font-bold">Specialties</p>
+                        <p className="text-xs text-slate-500">{specialtiesLoading ? '-' : specialties.length} registered fields</p>
+                    </Link>
+                </div>
+            </section>
 
-                <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                    <div className="mx-auto max-w-7xl space-y-7">
-                        {usersError && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{usersError}</div>}
-                        {doctorNotice && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{doctorNotice}</div>}
-
-                        <section className="flex flex-wrap items-end justify-between gap-3">
-                            <div><h1 className="text-3xl font-black tracking-tight">Dashboard Overview</h1><p className="text-sm text-slate-500">Healthcare system metrics and performance summary.</p></div>
-                            <div className="flex gap-2">
-                                <Link to="/admin/revenue" className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700">Export Data</Link>
-                                <button type="button" onClick={() => setIsNewDoctorOpen(true)} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">New Doctor</button>
-                            </div>
-                        </section>
-
-                        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <StatCard title="Total Users" icon="groups" value={usersLoading ? '-' : totalUsers} note={`Admins: ${totalAdmins} | Doctors: ${totalDoctors} | Patients: ${totalPatients}`} />
-                            <StatCard title="Total Bookings" icon="calendar_month" value={bookingState.loading ? '-' : bookingState.total ?? '-'} note="Live data from recent booking activity." iconClass="bg-amber-100 text-amber-700" />
-                            <StatCard title="Active Clinics" icon="location_on" value={clinicsLoading ? '-' : clinics.length} note="Registered locations in system." iconClass="bg-emerald-100 text-emerald-700" />
-                            <StatCard title="Total Revenue" icon="payments" value={revenue} note="Current month. Use Export Data to review previous months and download PDF reports." />
-                        </section>
-
-                        <section className="space-y-3">
-                            <h2 className="text-2xl font-black tracking-tight">User Management - Doctors</h2>
-                            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                                <table className="w-full min-w-[700px] text-left">
-                                    <thead className="border-b border-slate-200 bg-slate-50"><tr><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Doctor</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Specialty</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Clinic</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Status</th><th className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-500">Actions</th></tr></thead>
-                                    <tbody className="divide-y divide-slate-200">
-                                        {doctorsLoading ? <tr><td colSpan={5} className="px-6 py-8 text-sm text-slate-500">Loading doctors...</td></tr> : filteredRows.map((doctor) => (
-                                            <tr key={doctor.id} className="hover:bg-slate-50">
-                                                <td className="px-6 py-4"><p className="text-sm font-bold">{doctor.name}</p><p className="text-xs text-slate-500">{doctor.email}</p></td>
-                                                <td className="px-6 py-4"><span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">{doctor.specialty}</span></td>
-                                                <td className="px-6 py-4 text-sm text-slate-600">{doctor.clinic}</td>
-                                                <td className="px-6 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${doctor.statusClass}`}>{doctor.statusText}</span></td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-wrap gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleOpenEditDoctor(doctor.raw)}
-                                                            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-primary hover:text-primary"
-                                                        >
-                                                            Edit Profile
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleToggleDoctorActive(doctor)}
-                                                            disabled={doctorActionId === doctor.id}
-                                                            className={`rounded-lg px-3 py-1.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-60 ${doctor.isActive ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
-                                                        >
-                                                            {doctorActionId === doctor.id ? 'Saving...' : doctor.isActive ? 'Set Inactive' : 'Activate'}
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
-
-                        <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                            <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <h2 className="text-lg font-black">Booking Management</h2>
-                                <div className="mt-3 space-y-2.5">
-                                    {bookingState.loading ? <p className="text-sm text-slate-500">Loading bookings...</p> : bookingState.recent.length === 0 ? <p className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">No booking feed yet. Add GET /api/admin/bookings to show records here.</p> : bookingState.recent.map((item) => {
-                                        const statusTheme = getBookingStatusMeta(item, statusLabels);
-                                        const patientName = item.patient?.name || `Patient #${item.patientId || '--'}`;
-                                        const doctorName = item.doctor?.name || `Doctor #${item.doctorId || '--'}`;
-                                        const specialtyName = doctorSpecialtyById[String(item.doctorId)] || 'General';
-                                        const timeText = timeLabels[item.timeType] || item.timeType || '--';
-                                        const dateParts = getBookingDateParts(item.date);
-                                        return (
-                                            <div key={item.id} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2.5 sm:px-3">
-                                                <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${statusTheme.dateClass}`}>
-                                                    <div className="text-center leading-none">
-                                                        <p className="text-[9px] font-black tracking-wide">{dateParts.month}</p>
-                                                        <p className="mt-0.5 text-[20px] font-black">{Number.parseInt(dateParts.day, 10) || dateParts.day}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-sm font-black sm:text-base">Patient: {patientName}</p>
-                                                    <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">{doctorName} • {specialtyName}</p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <div className="text-right">
-                                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${statusTheme.chipClass}`}>
-                                                            {String(statusTheme.label).toUpperCase()}
-                                                        </span>
-                                                        <p className="mt-1 text-[11px] font-bold text-slate-400">{timeText}</p>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        className="rounded-full p-0.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
-                                                        aria-label="Booking options"
-                                                    >
-                                                        <span className="material-symbols-outlined text-[16px]">more_vert</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+            <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-xl font-black">Consultation Revenue</h2>
+                <p className="mt-1 text-sm text-slate-500">Last 6 months of recognized consultation revenue.</p>
+                <div className="mt-4 h-56">
+                    {revenueTrendState.loading ? (
+                        <div
+                            role="status"
+                            aria-label="Loading revenue trend"
+                            data-testid="consultation-revenue-loading"
+                            className="flex h-full items-stretch gap-3 animate-pulse"
+                        >
+                            {REVENUE_CHART_SKELETON_HEIGHTS.map((height, index) => (
+                                <div key={`skeleton-${index}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
+                                    <div className="flex min-h-0 flex-1 items-end rounded-t-xl bg-slate-100 px-1 pb-0">
+                                        <div className="w-full rounded-t-lg bg-slate-200" style={{ height }}></div>
+                                    </div>
+                                    <div className="mx-auto mt-3 h-3 w-8 rounded bg-slate-100"></div>
                                 </div>
-                                <button type="button" className="mt-3 w-full border-t border-slate-200 pt-3 text-center text-sm font-black text-primary hover:text-blue-700">
-                                    View Full Booking Calendar
-                                </button>
-                            </div>
+                            ))}
+                        </div>
+                    ) : revenueTrendState.error ? (
+                        <div
+                            data-testid="consultation-revenue-error"
+                            className="flex h-full items-center justify-center rounded-xl border border-red-100 bg-red-50/70 px-4 text-center text-sm text-red-700"
+                        >
+                            {revenueTrendState.error}
+                        </div>
+                    ) : revenueTrendItems.length === 0 ? (
+                        <div
+                            data-testid="consultation-revenue-empty"
+                            className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-sm text-slate-500"
+                        >
+                            Revenue trend unavailable right now.
+                        </div>
+                    ) : (
+                        <div data-testid="consultation-revenue-chart" className="flex h-full items-stretch gap-3">
+                            {revenueTrendItems.map((item) => {
+                                const amount = Number(item.recognizedRevenueAmount) || 0;
+                                const isCurrentMonth = item.month === revenueTrendState.currentMonth;
+                                const fullLabel = item.label || item.month;
+                                const amountLabel = formatMinorCurrency(amount, item.recognizedRevenueCurrency || revenueTrendState.currency);
+                                const shortLabel = formatRevenueMonthShortLabel(item.month);
 
-                            <div className="space-y-3">
-                                <h2 className="text-xl font-black">Master Data</h2>
-                                <Link to="/admin/clinics" className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40"><p className="text-sm font-bold">Clinics</p><p className="text-xs text-slate-500">{clinicsLoading ? '-' : clinics.length} active locations</p></Link>
-                                <Link to="/admin/specialties" className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40"><p className="text-sm font-bold">Specialties</p><p className="text-xs text-slate-500">{specialtiesLoading ? '-' : specialties.length} registered fields</p></Link>
-                            </div>
-                        </section>
-
-                        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <h2 className="text-xl font-black">Consultation Revenue</h2>
-                            <p className="mt-1 text-sm text-slate-500">Last 6 months of recognized consultation revenue.</p>
-                            <div className="mt-4 h-56">
-                                {revenueTrendState.loading ? (
+                                return (
                                     <div
-                                        role="status"
-                                        aria-label="Loading revenue trend"
-                                        data-testid="consultation-revenue-loading"
-                                        className="flex h-full items-stretch gap-3 animate-pulse"
+                                        key={item.month}
+                                        role="img"
+                                        title={`${fullLabel}: ${amountLabel}`}
+                                        aria-label={`${fullLabel}: ${amountLabel}`}
+                                        data-testid={`revenue-bar-${item.month}`}
+                                        data-month={item.month}
+                                        data-current-month={isCurrentMonth ? 'true' : 'false'}
+                                        tabIndex={0}
+                                        onMouseEnter={() => setActiveRevenueTooltipMonth(item.month)}
+                                        onMouseLeave={() => setActiveRevenueTooltipMonth((current) => (current === item.month ? '' : current))}
+                                        onFocus={() => setActiveRevenueTooltipMonth(item.month)}
+                                        onBlur={() => setActiveRevenueTooltipMonth((current) => (current === item.month ? '' : current))}
+                                        className="relative flex h-full min-w-0 flex-1 flex-col justify-end outline-none"
                                     >
-                                        {REVENUE_CHART_SKELETON_HEIGHTS.map((height, index) => (
-                                            <div key={`skeleton-${index}`} className="flex h-full min-w-0 flex-1 flex-col justify-end">
-                                                <div className="flex min-h-0 flex-1 items-end rounded-t-xl bg-slate-100 px-1 pb-0">
-                                                    <div className="w-full rounded-t-lg bg-slate-200" style={{ height }}></div>
-                                                </div>
-                                                <div className="mx-auto mt-3 h-3 w-8 rounded bg-slate-100"></div>
+                                        {activeRevenueTooltipMonth === item.month && (
+                                            <div
+                                                data-testid={`revenue-tooltip-${item.month}`}
+                                                className="pointer-events-none absolute left-1/2 top-2 z-10 w-max max-w-[calc(100%-8px)] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-xs text-white shadow-lg"
+                                            >
+                                                <p className="font-black">{fullLabel}</p>
+                                                <p className="mt-0.5 font-semibold text-slate-200">{amountLabel}</p>
                                             </div>
-                                        ))}
+                                        )}
+                                        <div className="flex min-h-0 flex-1 items-end rounded-t-xl bg-slate-50/70 px-1 pb-0">
+                                            <div
+                                                data-testid={`revenue-bar-fill-${item.month}`}
+                                                className={`w-full rounded-t-lg transition-[height,background-color] duration-300 ${isCurrentMonth ? 'bg-primary shadow-[0_10px_24px_rgba(37,99,235,0.28)]' : 'bg-primary/35'}`}
+                                                style={{ height: getRevenueBarHeight(amount, revenueTrendMax) }}
+                                            ></div>
+                                        </div>
+                                        <p className={`mt-2 text-center text-xs font-bold ${isCurrentMonth ? 'text-slate-700' : 'text-slate-400'}`}>
+                                            {shortLabel}
+                                        </p>
                                     </div>
-                                ) : revenueTrendState.error ? (
-                                    <div
-                                        data-testid="consultation-revenue-error"
-                                        className="flex h-full items-center justify-center rounded-xl border border-red-100 bg-red-50/70 px-4 text-center text-sm text-red-700"
-                                    >
-                                        {revenueTrendState.error}
-                                    </div>
-                                ) : revenueTrendItems.length === 0 ? (
-                                    <div
-                                        data-testid="consultation-revenue-empty"
-                                        className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-sm text-slate-500"
-                                    >
-                                        Revenue trend unavailable right now.
-                                    </div>
-                                ) : (
-                                    <div data-testid="consultation-revenue-chart" className="flex h-full items-stretch gap-3">
-                                        {revenueTrendItems.map((item) => {
-                                            const amount = Number(item.recognizedRevenueAmount) || 0;
-                                            const isCurrentMonth = item.month === revenueTrendState.currentMonth;
-                                            const fullLabel = item.label || item.month;
-                                            const amountLabel = formatMinorCurrency(amount, item.recognizedRevenueCurrency || revenueTrendState.currency);
-                                            const shortLabel = formatRevenueMonthShortLabel(item.month);
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </section>
 
-                                            return (
-                                                <div
-                                                    key={item.month}
-                                                    role="img"
-                                                    title={`${fullLabel}: ${amountLabel}`}
-                                                    aria-label={`${fullLabel}: ${amountLabel}`}
-                                                    data-testid={`revenue-bar-${item.month}`}
-                                                    data-month={item.month}
-                                                    data-current-month={isCurrentMonth ? 'true' : 'false'}
-                                                    tabIndex={0}
-                                                    onMouseEnter={() => setActiveRevenueTooltipMonth(item.month)}
-                                                    onMouseLeave={() => setActiveRevenueTooltipMonth((current) => (current === item.month ? '' : current))}
-                                                    onFocus={() => setActiveRevenueTooltipMonth(item.month)}
-                                                    onBlur={() => setActiveRevenueTooltipMonth((current) => (current === item.month ? '' : current))}
-                                                    className="relative flex h-full min-w-0 flex-1 flex-col justify-end outline-none"
-                                                >
-                                                    {activeRevenueTooltipMonth === item.month && (
-                                                        <div
-                                                            data-testid={`revenue-tooltip-${item.month}`}
-                                                            className="pointer-events-none absolute left-1/2 top-2 z-10 w-max max-w-[calc(100%-8px)] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-xs text-white shadow-lg"
-                                                        >
-                                                            <p className="font-black">{fullLabel}</p>
-                                                            <p className="mt-0.5 font-semibold text-slate-200">{amountLabel}</p>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex min-h-0 flex-1 items-end rounded-t-xl bg-slate-50/70 px-1 pb-0">
-                                                        <div
-                                                            data-testid={`revenue-bar-fill-${item.month}`}
-                                                            className={`w-full rounded-t-lg transition-[height,background-color] duration-300 ${isCurrentMonth ? 'bg-primary shadow-[0_10px_24px_rgba(37,99,235,0.28)]' : 'bg-primary/35'}`}
-                                                            style={{ height: getRevenueBarHeight(amount, revenueTrendMax) }}
-                                                        ></div>
-                                                    </div>
-                                                    <p className={`mt-2 text-center text-xs font-bold ${isCurrentMonth ? 'text-slate-700' : 'text-slate-400'}`}>
-                                                        {shortLabel}
-                                                    </p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        </section>
-                    </div>
-                </main>
-            </div>
             <NewDoctorModal
                 isOpen={isNewDoctorOpen}
                 onClose={() => setIsNewDoctorOpen(false)}
@@ -703,10 +660,8 @@ const AdminDashboard = () => {
                 doctor={selectedDoctor}
                 onUpdated={handleDoctorUpdated}
             />
-        </div>
+        </AdminShell>
     );
 };
 
 export default AdminDashboard;
-
-
