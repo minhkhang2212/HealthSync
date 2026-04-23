@@ -113,4 +113,86 @@ describe('PatientDashboard', () => {
 
         expect(window.location.pathname).toBe('/patient/discover');
     });
+
+    it('keeps the shared footer and sorts appointments newest first in the appointments view', async () => {
+        window.history.replaceState(null, '', '/patient');
+
+        renderWithProviders(<PatientDashboard />, {
+            preloadedState: {
+                ...baseState,
+                doctor: {
+                    ...baseState.doctor,
+                    doctors: [
+                        {
+                            id: 7,
+                            name: 'Dr Cardio',
+                            email: 'cardio@healthsync.com',
+                            image: null,
+                            doctor_infor: { nameClinic: 'London Heart Clinic', addressClinic: 'London Bridge' },
+                            doctor_clinic_specialties: [{
+                                specialtyId: 1,
+                                clinicId: 10,
+                                clinic: { id: 10, name: 'London Heart Clinic', address: 'London Bridge' },
+                                specialty: { id: 1, name: 'Cardiology' },
+                            }],
+                        },
+                        {
+                            id: 8,
+                            name: 'Dr Skin',
+                            email: 'skin@healthsync.com',
+                            image: null,
+                            doctor_infor: { nameClinic: 'London Skin Clinic', addressClinic: 'Soho' },
+                            doctor_clinic_specialties: [{
+                                specialtyId: 2,
+                                clinicId: 11,
+                                clinic: { id: 11, name: 'London Skin Clinic', address: 'Soho' },
+                                specialty: { id: 2, name: 'Dermatology' },
+                            }],
+                        },
+                    ],
+                },
+                booking: {
+                    ...baseState.booking,
+                    bookings: [
+                        {
+                            id: 22,
+                            doctorId: 7,
+                            date: '2026-03-31',
+                            timeType: 'T1',
+                            statusId: 'S1',
+                            patientContactEmail: 'patient@example.com',
+                        },
+                        {
+                            id: 23,
+                            doctorId: 8,
+                            date: '2026-04-03',
+                            timeType: 'T2',
+                            statusId: 'S3',
+                            patientContactEmail: 'patient@example.com',
+                        },
+                        {
+                            id: 24,
+                            doctorId: 7,
+                            date: '2026-04-03',
+                            timeType: 'T5',
+                            statusId: 'S1',
+                            confirmedAt: '2026-04-02T09:00:00Z',
+                            patientContactEmail: 'patient@example.com',
+                        },
+                    ],
+                },
+            },
+        });
+
+        await userEvent.click(screen.getByRole('button', { name: /^My Appointments$/i }));
+
+        expect(screen.getByRole('heading', { name: 'My Appointments' })).toBeInTheDocument();
+        expect(screen.getByText(/HealthSync Platform\. All rights reserved\./i)).toBeInTheDocument();
+
+        const cards = screen.getAllByTestId(/patient-booking-/);
+        expect(cards).toHaveLength(3);
+        expect(cards[0]).toHaveTextContent('Booking #24');
+        expect(cards[1]).toHaveTextContent('Booking #23');
+        expect(cards[2]).toHaveTextContent('Booking #22');
+    });
 });

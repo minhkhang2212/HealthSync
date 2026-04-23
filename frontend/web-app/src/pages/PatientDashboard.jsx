@@ -11,7 +11,7 @@ import PatientAiEntryCard from '../components/ai/PatientAiEntryCard';
 import apiClient, { getApiAssetBase } from '../utils/apiClient';
 import { readAllcodeCache, writeAllcodeCache } from '../utils/allcodeCache';
 import { canPatientCancelBooking, getPaymentSummary, isOnlinePaymentPending } from '../utils/bookingPayments';
-import { DEFAULT_TIME_LABELS } from '../utils/timeSlots';
+import { DEFAULT_TIME_LABELS, getTimeTypeOrder } from '../utils/timeSlots';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
 import { BsCheckCircleFill } from 'react-icons/bs';
@@ -37,7 +37,7 @@ const normalizeId = (value) => (value == null ? '' : String(value));
 
 const bookingSortValue = (booking) => {
     const dateValue = new Date(`${booking.date}T00:00:00`).getTime();
-    const slotValue = (Number.parseInt(String(booking.timeType).replace(/\D/g, ''), 10) || 99) * 3600000;
+    const slotValue = getTimeTypeOrder(booking.timeType) * 3600000;
     return Number.isNaN(dateValue) ? Number.MAX_SAFE_INTEGER : dateValue + slotValue;
 };
 
@@ -77,16 +77,67 @@ const getBookingStatusMeta = (booking, statusLabels) => {
         };
     }
 
-    if (isOnlinePaymentPending(booking)) {
+    return {
+        label: statusLabels.S1 || 'New',
+        className: STATUS_BADGE_CLASSES.S1,
+    };
+};
+
+const getPatientAppointmentVisual = (booking, paymentSummary) => {
+    if (booking.statusId === 'S2') {
         return {
-            label: 'Awaiting payment',
-            className: 'bg-amber-50 text-amber-700 border-amber-200',
+            icon: 'cancel',
+            bubbleClass: 'bg-red-50 text-red-600',
+            articleClass: 'opacity-85',
+        };
+    }
+
+    if (booking.statusId === 'S3') {
+        return {
+            icon: 'check_circle',
+            bubbleClass: 'bg-emerald-50 text-emerald-600',
+            articleClass: '',
+        };
+    }
+
+    if (booking.statusId === 'S4') {
+        return {
+            icon: 'person_off',
+            bubbleClass: 'bg-amber-50 text-amber-600',
+            articleClass: '',
+        };
+    }
+
+    if (booking.confirmedAt) {
+        return {
+            icon: 'calendar_today',
+            bubbleClass: 'bg-blue-50 text-primary',
+            articleClass: '',
+        };
+    }
+
+    if (paymentSummary.tone === 'pending') {
+        return {
+            icon: 'payments',
+            bubbleClass: 'bg-amber-50 text-amber-600',
+            articleClass: '',
         };
     }
 
     return {
-        label: statusLabels.S1 || 'New',
-        className: STATUS_BADGE_CLASSES.S1,
+        icon: 'schedule',
+        bubbleClass: 'bg-slate-100 text-slate-500',
+        articleClass: '',
+    };
+};
+
+const resolveDoctorAppointmentMeta = (doctor) => {
+    const mapping = doctor?.doctor_clinic_specialties?.[0];
+
+    return {
+        specialtyName: mapping?.specialty?.name || 'Specialty updating',
+        clinicName: mapping?.clinic?.name || doctor?.doctor_infor?.nameClinic || 'Clinic updating',
+        doctorEmail: doctor?.email || 'Clinic contact updating',
     };
 };
 
@@ -379,12 +430,16 @@ const PatientDashboard = () => {
         [specialties, specialtyDoctorCount]
     );
 
-    const sortedBookings = React.useMemo(
+    const sortedBookingsAscending = React.useMemo(
         () => [...bookings].sort((a, b) => bookingSortValue(a) - bookingSortValue(b)),
         [bookings]
     );
+    const sortedBookingsDescending = React.useMemo(
+        () => [...bookings].sort((a, b) => bookingSortValue(b) - bookingSortValue(a)),
+        [bookings]
+    );
 
-    const upcomingBooking = sortedBookings.find((booking) => booking.statusId === 'S1');
+    const upcomingBooking = sortedBookingsAscending.find((booking) => booking.statusId === 'S1');
     const upcomingDoctor = upcomingBooking ? doctorById.get(normalizeId(upcomingBooking.doctorId)) : null;
     const orderedClinics = React.useMemo(
         () =>
@@ -798,63 +853,134 @@ const PatientDashboard = () => {
                         </section>
                     </div>
                 ) : (
-                    <section className="space-y-4">
-                        <div className="flex items-center justify-between gap-2">
-                            <h1 className="text-2xl font-black sm:text-3xl">My Appointments</h1>
-                            <button onClick={() => setView('dashboard')} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400">Back to Dashboard</button>
-                        </div>
-                        {bookingError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{bookingError}</div>}
-                        {loadingBookings ? <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">Loading appointments...</div> : (
-                            <div className="space-y-3">
-                                {sortedBookings.map((booking) => {
-                                    const doctor = doctorById.get(normalizeId(booking.doctorId));
-                                    const status = getBookingStatusMeta(booking, statusLabels);
-                                    const paymentSummary = getPaymentSummary(booking);
-                                    const canCancel = canPatientCancelBooking(booking);
-                                    return (
-                                        <article key={booking.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div>
-                                                    <p className="font-black">Booking #{booking.id}</p>
-                                                    <p className="text-sm text-slate-500">{doctor?.name || `Doctor #${booking.doctorId}`}</p>
-                                                </div>
-                                                <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-600">Date: {formatBookingDate(booking.date)}</p>
-                                            <p className="text-sm text-slate-600">Time: {timeLabels[booking.timeType] || booking.timeType}</p>
-                                            <p className="text-sm text-slate-600">Contact email: {booking.patientContactEmail || user?.email || 'Not provided'}</p>
-                                            <p className="text-sm text-slate-600">Payment: {paymentSummary.label}</p>
-                                            {booking.confirmedAt && booking.statusId === 'S1' && (
-                                                <p className="mt-3 text-sm font-medium text-blue-700">
-                                                    Your doctor has confirmed this appointment.
-                                                </p>
-                                            )}
-                                            {!booking.confirmedAt && paymentSummary.tone === 'pending' && (
-                                                <p className="mt-3 text-sm font-medium text-amber-700">
-                                                    Online payment is still pending. The clinic cannot confirm this booking until payment completes.
-                                                </p>
-                                            )}
-                                            {!booking.confirmedAt && paymentSummary.tone === 'paid' && (
-                                                <p className="mt-3 text-sm font-medium text-emerald-700">
-                                                    Your payment was received successfully. The clinic can now confirm the appointment.
-                                                </p>
-                                            )}
-                                            {canCancel && (
-                                                <button
-                                                    onClick={() => handleCancelBooking(booking.id)}
-                                                    disabled={actionLoadingId === booking.id}
-                                                    className="mt-3 rounded-xl bg-red-100 px-4 py-2 text-sm font-bold text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                                >
-                                                    {actionLoadingId === booking.id ? 'Cancelling...' : 'Cancel Appointment'}
-                                                </button>
-                                            )}
-                                        </article>
-                                    );
-                                })}
-                                {sortedBookings.length === 0 && <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">No appointments yet.</div>}
+                    <div className="space-y-0">
+                        <section className="w-full bg-slate-100">
+                            <div className="mx-auto w-full max-w-[1240px] px-4 py-8 sm:px-8 sm:py-10">
+                                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                                    <div>
+                                        <h1 className="text-4xl font-black tracking-tight text-slate-900 sm:text-5xl">My Appointments</h1>
+                                        <p className="mt-3 max-w-2xl text-sm font-medium text-slate-500 sm:text-base">
+                                            Manage your clinical visits and digital consultations.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        onClick={() => setView('dashboard')}
+                                        className="inline-flex items-center gap-2 self-start rounded-2xl bg-primary px-5 py-3 text-sm font-black text-white shadow-lg shadow-blue-500/20 transition-transform duration-150 active:scale-95 lg:self-auto"
+                                    >
+                                        <span className="material-symbols-outlined text-[20px]">dashboard</span>
+                                        Back to Dashboard
+                                    </button>
+                                </div>
                             </div>
-                        )}
-                    </section>
+                        </section>
+
+                        <section className="w-full bg-slate-100">
+                            <div className="mx-auto w-full max-w-[1240px] px-4 pb-10 sm:px-8 sm:pb-12">
+                                {bookingError && (
+                                    <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                                        {bookingError}
+                                    </div>
+                                )}
+
+                                {loadingBookings ? (
+                                    <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
+                                        Loading appointments...
+                                    </div>
+                                ) : sortedBookingsDescending.length === 0 ? (
+                                    <div className="rounded-[28px] border border-slate-200 bg-white p-10 text-center shadow-sm">
+                                        <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-slate-400">
+                                            <span className="material-symbols-outlined text-[30px]">calendar_month</span>
+                                        </div>
+                                        <h2 className="mt-5 text-2xl font-black text-slate-900">No appointments yet</h2>
+                                        <p className="mt-2 text-sm text-slate-500">
+                                            Book your first visit from the dashboard to see upcoming and past appointments here.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-5" data-testid="patient-appointments-list">
+                                        {sortedBookingsDescending.map((booking) => {
+                                            const doctor = doctorById.get(normalizeId(booking.doctorId));
+                                            const status = getBookingStatusMeta(booking, statusLabels);
+                                            const paymentSummary = getPaymentSummary(booking);
+                                            const canCancel = canPatientCancelBooking(booking);
+                                            const visual = getPatientAppointmentVisual(booking, paymentSummary);
+                                            const { specialtyName, clinicName, doctorEmail } = resolveDoctorAppointmentMeta(doctor);
+
+                                            return (
+                                                <article
+                                                    key={booking.id}
+                                                    data-testid={`patient-booking-${booking.id}`}
+                                                    className={`rounded-[30px] border border-slate-200 bg-white px-6 py-7 shadow-[0_14px_34px_rgba(15,23,42,0.05)] transition-colors duration-300 hover:bg-slate-50 sm:px-8 ${visual.articleClass}`}
+                                                >
+                                                    <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+                                                        <div className="flex flex-col gap-6 md:flex-row md:gap-8 xl:flex-1">
+                                                            <div className="shrink-0">
+                                                                <div className={`grid h-[72px] w-[72px] place-items-center rounded-full ${visual.bubbleClass}`}>
+                                                                    <span className="material-symbols-outlined text-[30px]">{visual.icon}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid flex-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                                                                <div>
+                                                                    <h2 className="text-[28px] font-black leading-none tracking-tight text-slate-900 sm:text-[32px] md:text-[30px] xl:text-[32px]">
+                                                                        {doctor?.name || `Doctor #${booking.doctorId}`}
+                                                                    </h2>
+                                                                    <p className="mt-2 text-base font-medium text-slate-500">{specialtyName}</p>
+                                                                    <p className="mt-4 flex items-start gap-2 text-sm text-slate-500">
+                                                                        <span className="material-symbols-outlined mt-0.5 text-[18px] text-slate-400">location_on</span>
+                                                                        <span>{clinicName}</span>
+                                                                    </p>
+                                                                </div>
+
+                                                                <div>
+                                                                    <div className="flex items-center gap-2 text-base font-black text-slate-900">
+                                                                        <span className="material-symbols-outlined text-[18px] text-primary">event</span>
+                                                                        <span>{formatBookingDate(booking.date)}</span>
+                                                                    </div>
+                                                                    <div className="mt-3 flex items-center gap-2 text-base text-slate-500">
+                                                                        <span className="material-symbols-outlined text-[18px] text-slate-400">schedule</span>
+                                                                        <span>{timeLabels[booking.timeType] || booking.timeType}</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <p className="text-base font-semibold text-slate-600">{doctorEmail}</p>
+                                                                    <p className="mt-3 text-base font-black text-primary">{paymentSummary.label}</p>
+                                                                    <p className="mt-4 text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                                                                        Booking #{booking.id}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-col items-start gap-3 xl:min-w-[170px] xl:items-end">
+                                                            <span className={`inline-flex rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.16em] ${status.className}`}>
+                                                                {status.label}
+                                                            </span>
+                                                            {canCancel && (
+                                                                <button
+                                                                    onClick={() => handleCancelBooking(booking.id)}
+                                                                    disabled={actionLoadingId === booking.id}
+                                                                    className="rounded-full bg-red-100 px-4 py-2 text-sm font-bold text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                >
+                                                                    {actionLoadingId === booking.id ? 'Cancelling...' : 'Cancel Appointment'}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </article>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        <section className="relative left-1/2 w-screen -translate-x-1/2 overflow-hidden bg-white">
+                            <PatientPortalFooter />
+                        </section>
+                    </div>
                 )}
             </main>
         </div>

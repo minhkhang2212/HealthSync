@@ -157,7 +157,6 @@ const DoctorAppointments = () => {
     const dispatch = useDispatch();
     const { bookings, loadingBookings, error } = useSelector((state) => state.schedule);
     const [actionLoading, setActionLoading] = React.useState(null);
-    const [search, setSearch] = React.useState('');
     const [selectedDate, setSelectedDate] = React.useState(() => formatLondonDate(new Date()));
     const [timeLabels, setTimeLabels] = React.useState(DEFAULT_TIME_LABELS);
     const [notice, setNotice] = React.useState('');
@@ -204,29 +203,11 @@ const DoctorAppointments = () => {
     }, []);
 
     const filteredBookings = React.useMemo(() => {
-        const query = search.trim().toLowerCase();
         return bookings
             .map((booking) => ({
                 ...booking,
                 timeLabel: timeLabels[booking.timeType] || booking.timeType,
             }))
-            .filter((booking) => {
-                if (!query) return true;
-
-                const haystack = [
-                    booking.id,
-                    booking.patient?.name,
-                    booking.patient?.email,
-                    booking.patientContactEmail,
-                    booking.patientId,
-                    booking.date,
-                    booking.timeType,
-                    booking.timeLabel,
-                    booking.statusId,
-                ].join(' ').toLowerCase();
-
-                return haystack.includes(query);
-            })
             .sort((left, right) => {
                 if (left.date !== right.date) {
                     return String(left.date).localeCompare(String(right.date));
@@ -236,7 +217,7 @@ const DoctorAppointments = () => {
                 const rightOrder = Number.parseInt(String(right.timeType || '').replace(/\D/g, ''), 10) || 999;
                 return leftOrder - rightOrder;
             });
-    }, [bookings, search, timeLabels]);
+    }, [bookings, timeLabels]);
 
     const openConfirmModal = (booking) => {
         setEmailModal({
@@ -320,12 +301,7 @@ const DoctorAppointments = () => {
     };
 
     return (
-        <DoctorShell
-            searchValue={search}
-            onSearchChange={setSearch}
-            searchPlaceholder="Search appointments by patient, email, date, slot..."
-            showSearch
-        >
+        <DoctorShell>
             <section className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                     <h1 className="text-3xl font-black tracking-tight">My Appointments</h1>

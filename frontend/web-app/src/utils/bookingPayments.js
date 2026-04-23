@@ -28,7 +28,7 @@ export const canDoctorConfirmBooking = (booking) => {
 export const getPaymentSummary = (booking) => {
     if (isOnlinePaymentPending(booking)) {
         return {
-            label: 'Awaiting payment',
+            label: 'Online payment',
             tone: 'pending',
             detail: 'Stripe checkout is still pending.',
         };
