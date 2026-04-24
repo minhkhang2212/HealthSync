@@ -39,6 +39,10 @@ return [
         'url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+    ],
+
     'stripe' => [
         'secret_key' => env('STRIPE_SECRET_KEY'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),

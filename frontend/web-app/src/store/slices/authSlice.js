@@ -46,6 +46,22 @@ export const fetchCurrentUser = createAsyncThunk(
     }
 );
 
+export const googleAuth = createAsyncThunk(
+    'auth/googleAuth',
+    async (credential, { rejectWithValue }) => {
+        try {
+            const response = await apiClient.post('/auth/google', { credential });
+            return response.data; // { access_token, token_type, user }
+        } catch (error) {
+            const errors = error.response?.data?.errors;
+            const message = errors
+                ? Object.values(errors).flat().join(' ')
+                : error.response?.data?.message || 'Google sign in failed.';
+            return rejectWithValue(message);
+        }
+    }
+);
+
 export const logoutUser = createAsyncThunk(
     'auth/logoutUser',
     async (_, { rejectWithValue }) => {
@@ -76,19 +92,21 @@ const authSlice = createSlice({
         },
     },
     extraReducers: (builder) => {
+        const applyAuthSuccess = (state, action) => {
+            state.loading = false;
+            state.isAuthenticated = true;
+            state.user = action.payload.user;
+            state.token = action.payload.access_token;
+            localStorage.setItem('auth_token', action.payload.access_token);
+        };
+
         // Login
         builder
             .addCase(loginUser.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(loginUser.fulfilled, (state, action) => {
-                state.loading = false;
-                state.isAuthenticated = true;
-                state.user = action.payload.user;
-                state.token = action.payload.access_token;
-                localStorage.setItem('auth_token', action.payload.access_token);
-            })
+            .addCase(loginUser.fulfilled, applyAuthSuccess)
             .addCase(loginUser.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
@@ -100,14 +118,20 @@ const authSlice = createSlice({
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(registerUser.fulfilled, (state, action) => {
-                state.loading = false;
-                state.isAuthenticated = true;
-                state.user = action.payload.user;
-                state.token = action.payload.access_token;
-                localStorage.setItem('auth_token', action.payload.access_token);
-            })
+            .addCase(registerUser.fulfilled, applyAuthSuccess)
             .addCase(registerUser.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            });
+
+        // Google Auth
+        builder
+            .addCase(googleAuth.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(googleAuth.fulfilled, applyAuthSuccess)
+            .addCase(googleAuth.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             });

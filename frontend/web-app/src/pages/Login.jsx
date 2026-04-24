@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { loginUser, clearError } from '../store/slices/authSlice';
+import GoogleAuthButton from '../components/auth/GoogleAuthButton';
+import { loginUser, googleAuth, clearError } from '../store/slices/authSlice';
 
 const Login = () => {
     const [credentials, setCredentials] = useState({ email: '', password: '' });
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const { loading, error } = useSelector((state) => state.auth);
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
     const handleChange = (event) => {
         if (error) {
@@ -16,10 +18,24 @@ const Login = () => {
         setCredentials({ ...credentials, [event.target.name]: event.target.value });
     };
 
+    const redirectForRole = (user) => {
+        const role = user?.roleId;
+        if (role === 'R1') navigate('/admin/dashboard');
+        else if (role === 'R2') navigate('/doctor/dashboard');
+        else navigate('/patient');
+    };
+
     const handleLogin = async (event) => {
         event.preventDefault();
         const result = await dispatch(loginUser(credentials));
         if (loginUser.fulfilled.match(result)) {
+            redirectForRole(result.payload.user);
+        }
+    };
+
+    const handleGoogleCredential = async (credential) => {
+        const result = await dispatch(googleAuth(credential));
+        if (googleAuth.fulfilled.match(result)) {
             const role = result.payload.user?.roleId;
             if (role === 'R1') navigate('/admin/dashboard');
             else if (role === 'R2') navigate('/doctor/dashboard');
@@ -123,33 +139,27 @@ const Login = () => {
                             )}
                         </button>
 
-                        <div className="relative flex items-center py-4">
-                            <div className="flex-grow border-t border-slate-200"></div>
-                            <span className="flex-shrink mx-4 text-slate-400 text-xs font-semibold uppercase tracking-wider">Or continue with</span>
-                            <div className="flex-grow border-t border-slate-200"></div>
-                        </div>
+                        {googleClientId && (
+                            <>
+                                <div className="relative flex items-center py-4">
+                                    <div className="flex-grow border-t border-slate-200"></div>
+                                    <span className="flex-shrink mx-4 text-slate-400 text-xs font-semibold uppercase tracking-wider">Or continue with</span>
+                                    <div className="flex-grow border-t border-slate-200"></div>
+                                </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <button className="flex items-center justify-center gap-2 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700" type="button">
-                                <img alt="Google" className="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbAh_U3H1HDxNMXm28jCa9WRhbZqz69sH6u5uPlzLRF5oqQZMO-XyvVMilQ9WiymwE_jqQ8SzlqGxFm_PxLBNtXeygzqXmnJc0KNvLx4qHu3q8mpbKXnL8HB1SeD57d5V63MHI9athqAje__7J-R8s_IDSbaL0g3XXigTV21GUBofUojVo_951QJPpzW-zOTKnjjwUCvz4nMlwX6jCmX-XckYrE3xHQUbS6FUmqdKtkVWV3h3GlMVd9JJ7e59WNQD6f-VXblAkk4QY" />
-                                <span className="text-sm font-semibold">Google</span>
-                            </button>
-                            <button className="flex items-center justify-center gap-2 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700" type="button">
-                                <span className="material-symbols-outlined text-xl">ios</span>
-                                <span className="text-sm font-semibold">Apple</span>
-                            </button>
-                        </div>
+                                <GoogleAuthButton
+                                    clientId={googleClientId}
+                                    disabled={loading}
+                                    onCredential={handleGoogleCredential}
+                                />
+                            </>
+                        )}
                     </form>
 
                     <p className="mt-8 text-center text-slate-600">
                         Don't have an account?
                         <Link to="/register" className="text-primary font-bold hover:underline ml-1">Sign up for free</Link>
                     </p>
-
-                    <div className="mt-10 pt-6 border-t border-slate-200 flex items-center justify-center gap-2 text-slate-500">
-                        <span className="material-symbols-outlined text-sm">verified_user</span>
-                        <span className="text-xs font-medium tracking-tight">HIPAA Compliant & Encrypted Data</span>
-                    </div>
                 </div>
             </div>
         </div>
