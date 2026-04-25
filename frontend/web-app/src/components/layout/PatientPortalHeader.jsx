@@ -71,7 +71,6 @@ const PatientPortalHeader = ({
                     </button>
                     {menuOpen && (
                         <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-md">
-                            <button type="button" onClick={closeMenuAfterAction(onClinics)} className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${clinicsActive ? 'bg-blue-50 text-primary' : ''}`}>Clinics</button>
                             <button
                                 type="button"
                                 onClick={closeMenuAfterAction(onAiSupport)}
@@ -85,6 +84,8 @@ const PatientPortalHeader = ({
                                     New
                                 </span>
                             </button>
+                            <button type="button" onClick={closeMenuAfterAction(onFindDoctors)} className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${findDoctorsActive ? 'bg-blue-50 text-primary' : ''}`}>Find Doctors</button>
+                            <button type="button" onClick={closeMenuAfterAction(onClinics)} className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${clinicsActive ? 'bg-blue-50 text-primary' : ''}`}>Clinics</button>
                             <button type="button" onClick={closeMenuAfterAction(onAppointments)} className={`w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-100 ${appointmentsActive ? 'bg-blue-50 text-primary' : ''}`}>My Appointments</button>
                             <button type="button" onClick={closeMenuAfterAction(onLogout)} className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">Logout</button>
                         </div>
