@@ -1,25 +1,32 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import PatientDashboard from './pages/PatientDashboard';
-import PatientDiscover from './pages/PatientDiscover';
-import PatientDoctorDirectory from './pages/PatientDoctorDirectory';
-import ClinicDirectory from './pages/ClinicDirectory';
-import ClinicDetail from './pages/ClinicDetail';
-import DoctorDetail from './pages/DoctorDetail';
-import SpecialtyDetail from './pages/SpecialtyDetail';
-import DoctorDashboard from './pages/DoctorDashboard';
-import DoctorAppointments from './pages/DoctorAppointments';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import AdminDashboard from './pages/AdminDashboard';
-import DoctorManagement from './pages/DoctorManagement';
-import BookingManagement from './pages/BookingManagement';
-import AdminRevenueReports from './pages/AdminRevenueReports';
-import ClinicManagement from './pages/ClinicManagement';
-import SpecialtyManagement from './pages/SpecialtyManagement';
-import PatientAiTriage from './pages/PatientAiTriage';
-import PatientPaymentStatus from './pages/PatientPaymentStatus';
+
+const PatientDashboard = React.lazy(() => import('./pages/PatientDashboard'));
+const PatientDiscover = React.lazy(() => import('./pages/PatientDiscover'));
+const PatientDoctorDirectory = React.lazy(() => import('./pages/PatientDoctorDirectory'));
+const ClinicDirectory = React.lazy(() => import('./pages/ClinicDirectory'));
+const ClinicDetail = React.lazy(() => import('./pages/ClinicDetail'));
+const DoctorDetail = React.lazy(() => import('./pages/DoctorDetail'));
+const SpecialtyDetail = React.lazy(() => import('./pages/SpecialtyDetail'));
+const DoctorDashboard = React.lazy(() => import('./pages/DoctorDashboard'));
+const DoctorAppointments = React.lazy(() => import('./pages/DoctorAppointments'));
+const Login = React.lazy(() => import('./pages/Login'));
+const Register = React.lazy(() => import('./pages/Register'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const DoctorManagement = React.lazy(() => import('./pages/DoctorManagement'));
+const BookingManagement = React.lazy(() => import('./pages/BookingManagement'));
+const AdminRevenueReports = React.lazy(() => import('./pages/AdminRevenueReports'));
+const ClinicManagement = React.lazy(() => import('./pages/ClinicManagement'));
+const SpecialtyManagement = React.lazy(() => import('./pages/SpecialtyManagement'));
+const PatientAiTriage = React.lazy(() => import('./pages/PatientAiTriage'));
+const PatientPaymentStatus = React.lazy(() => import('./pages/PatientPaymentStatus'));
+
+const PageLoader = () => (
+    <div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-slate-500">
+        Loading...
+    </div>
+);
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -51,46 +58,48 @@ const RootRedirect = () => {
 const AppRouter = () => {
     return (
         <Router>
-            <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<RootRedirect />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
+            <React.Suspense fallback={<PageLoader />}>
+                <Routes>
+                    {/* Public Routes */}
+                    <Route path="/" element={<RootRedirect />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
 
-                {/* Patient Routes */}
-                <Route path="/patient" element={<ProtectedRoute allowedRoles={['R3']} />}>
-                    <Route index element={<PatientDashboard />} />
-                    <Route path="discover" element={<PatientDiscover />} />
-                    <Route path="doctors" element={<PatientDoctorDirectory />} />
-                    <Route path="ai" element={<PatientAiTriage />} />
-                    <Route path="bookings/:bookingId/payment" element={<PatientPaymentStatus />} />
-                    <Route path="clinics" element={<ClinicDirectory />} />
-                    <Route path="clinics/:id" element={<ClinicDetail />} />
-                    <Route path="doctor/:id" element={<DoctorDetail />} />
-                    <Route path="specialties/:id" element={<SpecialtyDetail />} />
-                </Route>
+                    {/* Patient Routes */}
+                    <Route path="/patient" element={<ProtectedRoute allowedRoles={['R3']} />}>
+                        <Route index element={<PatientDashboard />} />
+                        <Route path="discover" element={<PatientDiscover />} />
+                        <Route path="doctors" element={<PatientDoctorDirectory />} />
+                        <Route path="ai" element={<PatientAiTriage />} />
+                        <Route path="bookings/:bookingId/payment" element={<PatientPaymentStatus />} />
+                        <Route path="clinics" element={<ClinicDirectory />} />
+                        <Route path="clinics/:id" element={<ClinicDetail />} />
+                        <Route path="doctor/:id" element={<DoctorDetail />} />
+                        <Route path="specialties/:id" element={<SpecialtyDetail />} />
+                    </Route>
 
-                {/* Doctor Routes */}
-                <Route path="/doctor" element={<ProtectedRoute allowedRoles={['R2']} />}>
-                    <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<DoctorDashboard />} />
-                    <Route path="appointments" element={<DoctorAppointments />} />
-                </Route>
+                    {/* Doctor Routes */}
+                    <Route path="/doctor" element={<ProtectedRoute allowedRoles={['R2']} />}>
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<DoctorDashboard />} />
+                        <Route path="appointments" element={<DoctorAppointments />} />
+                    </Route>
 
-                {/* Admin Routes */}
-                <Route path="/admin" element={<ProtectedRoute allowedRoles={['R1']} />}>
-                    <Route index element={<Navigate to="dashboard" replace />} />
-                    <Route path="dashboard" element={<AdminDashboard />} />
-                    <Route path="doctors" element={<DoctorManagement />} />
-                    <Route path="bookings" element={<BookingManagement />} />
-                    <Route path="revenue" element={<AdminRevenueReports />} />
-                    <Route path="clinics" element={<ClinicManagement />} />
-                    <Route path="specialties" element={<SpecialtyManagement />} />
-                </Route>
+                    {/* Admin Routes */}
+                    <Route path="/admin" element={<ProtectedRoute allowedRoles={['R1']} />}>
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                        <Route path="dashboard" element={<AdminDashboard />} />
+                        <Route path="doctors" element={<DoctorManagement />} />
+                        <Route path="bookings" element={<BookingManagement />} />
+                        <Route path="revenue" element={<AdminRevenueReports />} />
+                        <Route path="clinics" element={<ClinicManagement />} />
+                        <Route path="specialties" element={<SpecialtyManagement />} />
+                    </Route>
 
-                {/* Fallback */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                    {/* Fallback */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </React.Suspense>
         </Router>
     );
 };

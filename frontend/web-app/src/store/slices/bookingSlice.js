@@ -53,6 +53,11 @@ const bookingSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+        resetBookings: (state) => {
+            state.bookings = [];
+            state.loading = false;
+            state.error = null;
+        },
     },
     extraReducers: (builder) => {
         // Fetch
@@ -107,8 +112,32 @@ const bookingSlice = createSlice({
             .addCase(cancelBooking.rejected, (state, action) => {
                 state.error = action.payload;
             });
+
+        builder
+            .addCase('auth/loginUser.pending', (state) => {
+                state.bookings = [];
+                state.error = null;
+            })
+            .addCase('auth/registerUser.pending', (state) => {
+                state.bookings = [];
+                state.error = null;
+            })
+            .addCase('auth/googleAuth.pending', (state) => {
+                state.bookings = [];
+                state.error = null;
+            })
+            .addCase('auth/logoutUser.fulfilled', (state) => {
+                state.bookings = [];
+                state.loading = false;
+                state.error = null;
+            })
+            .addCase('auth/logoutUser.rejected', (state) => {
+                state.bookings = [];
+                state.loading = false;
+                state.error = null;
+            });
     },
 });
 
-export const { clearError } = bookingSlice.actions;
+export const { clearError, resetBookings } = bookingSlice.actions;
 export default bookingSlice.reducer;
