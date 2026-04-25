@@ -22,12 +22,6 @@ const SpecialtyManagement = React.lazy(() => import('./pages/SpecialtyManagement
 const PatientAiTriage = React.lazy(() => import('./pages/PatientAiTriage'));
 const PatientPaymentStatus = React.lazy(() => import('./pages/PatientPaymentStatus'));
 
-const PageLoader = () => (
-    <div className="grid min-h-screen place-items-center bg-slate-50 text-sm font-semibold text-slate-500">
-        Loading...
-    </div>
-);
-
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const { isAuthenticated, user } = useSelector(state => state.auth);
@@ -58,7 +52,7 @@ const RootRedirect = () => {
 const AppRouter = () => {
     return (
         <Router>
-            <React.Suspense fallback={<PageLoader />}>
+            <React.Suspense fallback={null}>
                 <Routes>
                     {/* Public Routes */}
                     <Route path="/" element={<RootRedirect />} />
