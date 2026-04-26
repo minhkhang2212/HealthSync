@@ -73,7 +73,7 @@ const Login = () => {
                     <div className="mb-10">
                         <div className="flex items-center gap-2 mb-8 md:hidden">
                             <span className="material-symbols-outlined text-primary text-3xl">medical_services</span>
-                            <span className="text-xl font-bold text-slate-900">HealthConnect</span>
+                            <span className="text-xl font-bold text-slate-900">HealthSync</span>
                         </div>
                         <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
                         <p className="text-slate-500">Please enter your details to access your health portal.</p>
